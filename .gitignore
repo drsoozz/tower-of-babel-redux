@@ -1,0 +1,72 @@
+# ============================
+# 1. Virtual Environment Files
+# ============================
+
+# Ignore the virtual environment folder (common name: venv)
+# These folders contain 3rd-party packages and are often large,
+# machine-specific, and unnecessary to track in Git.
+venv/
+
+# ============================
+# 2. Python Bytecode Caches
+# ============================
+
+# Ignore Python's cache folders and compiled bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+# These are auto-generated to speed up execution and don't need to be in version control.
+
+# ============================
+# 3. Build and Distribution Files
+# ============================
+
+# Ignore output folders from PyInstaller and similar tools
+build/
+dist/
+# These are generated every time you build your project and can be re-created at any time.
+
+# If you want to **keep your game’s .exe**, comment out the next line:
+# *.exe
+
+# Optional: Keep only your game's .exe, ignore the rest
+# !dist/mygame.exe
+
+# ============================
+# 4. IDE and Editor Settings
+# ============================
+
+# VS Code extension file (like VSCodeCounter)
+.VSCodeCounter
+# Common VSCode settings folders
+.vscode/
+# JetBrains IDEs (like PyCharm)
+.idea/
+
+# ============================
+# 5. Game Saves or Temp Files
+# ============================
+
+# Ignore saved game files
+*.sav
+# You may want to track save files elsewhere if doing backups, but they usually don’t belong in Git.
+
+# ============================
+# 6. OS-Generated Files
+# ============================
+
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+desktop.ini
+
+# ============================
+# 7. Logs and Temporary Output
+# ============================
+
+*.log
+*.tmp
+*.bak
+*.swp
