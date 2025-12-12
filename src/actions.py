@@ -4,6 +4,7 @@ import time
 from typing import Optional, Tuple, TYPE_CHECKING
 
 import color
+import consts
 import exceptions
 
 
@@ -32,6 +33,11 @@ class Action:
         """
         raise NotImplementedError()
 
+    def apply_cost(self, cost: int | float = 0) -> None:
+        self.entity.fighter.stats.initiative.initiative.modify(
+            amount=-int(cost), sudo=True
+        )
+
 
 class PickupAction(Action):
     """Pickup an item and add it to the inventory, if there is room for it."""
@@ -54,6 +60,7 @@ class PickupAction(Action):
                 inventory.items.append(item)
 
                 self.engine.message_log.add_message(f"You picked up the {item.name}!")
+                self.apply_cost()
                 return
 
         raise exceptions.Impossible("There is nothing here to pick up.")
@@ -78,6 +85,7 @@ class ItemAction(Action):
         """Invoke the items ability, this action will be given to provide context."""
         if self.item.consumable:
             self.item.consumable.activate(self)
+            self.apply_cost()
 
 
 class DropItem(ItemAction):
@@ -85,6 +93,7 @@ class DropItem(ItemAction):
         if self.entity.equipment.item_is_equipped(self.item):
             self.entity.equipment.toggle_equip(self.item)
         self.entity.inventory.drop(self.item)
+        self.apply_cost()
 
 
 class EquipAction(Action):
@@ -95,12 +104,19 @@ class EquipAction(Action):
 
     def perform(self) -> None:
         self.entity.equipment.toggle_equip(self.item)
+        self.apply_cost()
 
 
 class WaitAction(Action):
-    def perform(self) -> None:
+    def perform(self, from_error: bool = False) -> None:
         if self.entity == self.engine.player:
             time.sleep(0.05)
+        else:
+            time.sleep(0.001)
+        if from_error:
+            self.apply_cost(1e5)
+        else:
+            self.apply_cost(5e5)
 
 
 class TakeStairsAction(Action):
@@ -113,6 +129,7 @@ class TakeStairsAction(Action):
             self.engine.message_log.add_message(
                 "You ascend the staircase.", color.ascend.rgb
             )
+            self.apply_cost()
         else:
             raise exceptions.Impossible("There are no stairs here.")
 
@@ -167,6 +184,8 @@ class MeleeAction(ActionWithDirection):
         else:
             print(f"{attack_desc} but does no damage.")
 
+        self.apply_cost(5e5 * self.entity.fighter.stats.initiative.attack_multiplier)
+
 
 class MovementAction(ActionWithDirection):
     def perform(self) -> None:
@@ -184,7 +203,8 @@ class MovementAction(ActionWithDirection):
 
         self.entity.move(self.dx, self.dy)
         if self.entity == self.engine.player:
-            time.sleep(0.01)
+            time.sleep(0.001)
+        self.apply_cost(5e5 * self.entity.fighter.stats.initiative.movement_multiplier)
 
 
 class BumpAction(ActionWithDirection):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, TYPE_CHECKING
 
+import consts
 from components.stats.character_stat import CharacterStat
 from components.stats.stat_modifier import StatModifier
 from components.stats.stat_mod_types import StatModType
@@ -14,9 +15,8 @@ if TYPE_CHECKING:
 
 
 class Stats:
-    parent: Fighter
-
-    def __init__(self, *, base_stats: Dict[StatTypes, int | float]):
+    def __init__(self, *, base_stats: Dict[StatTypes, int | float], parent: Fighter):
+        self.parent = parent
         self.is_dirty = True
         self.strength = CharacterStat(
             base_value=base_stats[StatTypes.STRENGTH], name=StatTypes.STRENGTH.value
@@ -84,11 +84,11 @@ class Stats:
             self.encumbrance = self._create_encumbrance()
 
         try:
-            self.health_regen = CharacterStat(
+            self.hp_regen = CharacterStat(
                 base_value=base_stats[StatTypes.HP_REGEN], name=StatTypes.HP_REGEN.value
             )
         except KeyError:
-            self.health_regen = self._create_health_regen()
+            self.hp_regen = self._create_health_regen()
 
         try:
             self.energy_regen = CharacterStat(
@@ -111,9 +111,14 @@ class Stats:
         self.naked_legs_defense = self._create_naked_defense()
         self.naked_feet_defense = self._create_naked_defense()
 
-        self.initiative = Initiative()
-        self.initiative.parent = self
-        self.initiative.init_hook()
+        self.initiative = Initiative(self)
+
+    def regenerate(self, diff: int) -> None:
+        self.initiative.initiative.modify(diff, sudo=True)
+        time_factor = diff / consts.MAX_INIT
+        self.hp.regenerate(time_factor=time_factor, regen=self.hp_regen.value)
+        self.energy.regenerate(time_factor=time_factor, regen=self.energy_regen.value)
+        self.mana.regenerate(time_factor=time_factor, regen=self.mana_regen.value)
 
     # ################# #
     # STAT CONSTRUCTORS #

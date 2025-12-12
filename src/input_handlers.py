@@ -78,6 +78,7 @@ MainGameEventHandler will become the active handler.
 
 
 class BaseEventHandler:
+
     def handle_events(self, event: tcod.event.Event) -> BaseEventHandler:
         """Handle an event and return the next active event handler."""
         state = self.handle_event(event)
@@ -136,12 +137,14 @@ class EventHandler(BaseEventHandler):
     def __init__(self, engine: Engine):
         self.engine = engine
 
-    def handle_events(self, event: tcod.event.Event) -> None:
+    def handle_events(
+        self, event: tcod.event.Event, console: tcod.console.Console = None
+    ) -> None:
         """Handle events for input handlers with an engine."""
         action_or_state = self.handle_event(event)
         if isinstance(action_or_state, BaseEventHandler):
             return action_or_state
-        if self.handle_action(action_or_state):
+        if self.handle_action(action_or_state, console):
             # A valid action was performed.
             if not self.engine.player.is_alive:
                 # The player was killed sometime during or after the action.
@@ -151,7 +154,9 @@ class EventHandler(BaseEventHandler):
             return MainGameEventHandler(self.engine)  # Return to the main handler.
         return self
 
-    def handle_action(self, action: Optional[Action]) -> bool:
+    def handle_action(
+        self, action: Optional[Action], console: tcod.console.Console
+    ) -> bool:
         """Handle actions returned from event methods.
 
         Returns True if the action will advance a turn.
@@ -165,15 +170,17 @@ class EventHandler(BaseEventHandler):
             self.engine.message_log.add_message(exc.args[0], color.impossible.rgb)
             return False  # Skip enemy turn on exceptions.
 
-        self.engine.handle_enemy_turns()
-
+        for _ in self.engine.handle_enemy_turns():
+            self.engine.update_fov()
+            self.on_render(console)
         self.engine.update_fov()
+        self.on_render(console)
         return True
 
     def _handle_key(self, event: tcod.event.KeyDown) -> Optional[Action]:
         raise NotImplementedError()
 
-    def on_render(self, console: tcod.Console) -> None:
+    def on_render(self, console: tcod.console.Console) -> None:
         self.engine.render(console)
 
 

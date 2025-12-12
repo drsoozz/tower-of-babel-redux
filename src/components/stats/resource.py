@@ -55,6 +55,10 @@ class Resource:
     def minimize(self) -> None:
         self.value = 0
 
+    def regenerate(self, time_factor: float, regen: float, sudo: bool = False) -> None:
+        total_regen = time_factor * regen
+        self.modify(amount=total_regen, sudo=sudo)
+
 
 # subclass of Resource used for HP. calls the Fighter.die() method when hp reaches 0
 # CURRENTLY UNUSED, IS HANDLED IN Fighter
@@ -73,3 +77,45 @@ class HPResource(Resource):
     @value.setter
     def value(self, value: float) -> None:
         self._value = value
+
+
+class InitiativeResource(Resource):
+    """Resource subclass that only allows integer values for precision (fixed-point style)."""
+
+    def __init__(self, base_value: int | CharacterStat, name: str):
+        if isinstance(base_value, float):
+            raise TypeError("IntResource requires integer base_value.")
+        super().__init__(base_value=base_value, name=name)
+
+    @property
+    def max_value(self) -> int:
+        return int(self.max.value)
+
+    @property
+    def value(self) -> int:
+        return int(self._value)
+
+    @value.setter
+    def value(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("IntResource value must be an integer.")
+        self._value = value
+
+    def modify(self, amount: int, sudo: bool = False) -> int:
+        if not isinstance(amount, int):
+            raise TypeError("IntResource modify amount must be an integer.")
+
+        if sudo:
+            new_value = self.value + amount
+        else:
+            new_value = max(0, min(self.value + amount, self.max_value))
+
+        amount_modified = new_value - self.value
+        self.value = new_value
+        return amount_modified
+
+    def maximize(self) -> None:
+        self.value = self.max_value
+
+    def minimize(self) -> None:
+        self.value = 0

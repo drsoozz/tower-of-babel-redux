@@ -52,7 +52,9 @@ class HostileEnemy(BaseAI):
         super().__init__(entity)
         self.path: List[Tuple[int, int]] = []
 
-    def perform(self) -> None:
+    def perform(self) -> Action:
+        if not self.engine.player.is_alive:
+            WaitAction(self.entity).perform()
         target = self.engine.player
         dx = target.x - self.entity.x
         dy = target.y - self.entity.y
@@ -66,12 +68,12 @@ class HostileEnemy(BaseAI):
 
         if self.path:
             dest_x, dest_y = self.path.pop(0)
+
             return MovementAction(
                 self.entity,
                 dest_x - self.entity.x,
                 dest_y - self.entity.y,
             ).perform()
-
         return WaitAction(self.entity).perform()
 
 

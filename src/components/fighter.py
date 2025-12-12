@@ -19,8 +19,7 @@ class Fighter(BaseComponent):
 
     def __init__(self, base_stats: Dict[StatTypes, int | float]):
 
-        self.stats = Stats(base_stats=base_stats)
-        self.stats.parent = self
+        self.stats = Stats(base_stats=base_stats, parent=self)
 
     def init_hook(self) -> None:
         if self.parent.name == "Player":

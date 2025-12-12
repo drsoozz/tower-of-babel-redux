@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Iterable, Iterator, Optional, TYPE_CHECKING
+from typing import Iterable, Iterator, Optional, List, Tuple, TYPE_CHECKING
 
 import numpy as np  # type: ignore
 from tcod.console import Console
 
+import consts
 from entity import Actor, Item
 import tile_types
 
@@ -43,6 +44,15 @@ class GameMap:
             entity
             for entity in self.entities
             if isinstance(entity, Actor) and entity.is_alive
+        )
+
+    @property
+    def sorted_actors_by_initiative(self) -> List[Actor]:
+        return sorted(
+            self.actors,
+            key=lambda actor: consts.MAX_INIT
+            - actor.fighter.stats.initiative.initiative.value,
+            reverse=False,
         )
 
     @property

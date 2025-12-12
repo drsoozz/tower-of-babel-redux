@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import copy
 import math
+import random
 from typing import Optional, Tuple, Type, Self, TYPE_CHECKING, Union
 
+import consts
 from render_order import RenderOrder
 
 if TYPE_CHECKING:
@@ -124,6 +126,13 @@ class Actor(Entity):
     def is_alive(self) -> bool:
         """Returns True as long as this actor can perform actions."""
         return bool(self.ai)
+
+    def spawn(self, gamemap: GameMap, x: int, y: int) -> Self:
+        """Spawn a copy of this instance at the given location."""
+        spawn = super().spawn(gamemap=gamemap, x=x, y=y)
+        spawn.fighter.stats.initiative.initiative.value = random.randint(
+            0, consts.MAX_INIT - 1
+        )
 
 
 class Item(Entity):

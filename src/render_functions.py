@@ -69,8 +69,8 @@ def render_dungeon_level(console: Console, dungeon_level: int, x: int, y: int) -
     """
     Render the level the player is currently on, at the given location.
     """
-
-    console.print(x=x, y=y, text=f"Dungeon level: {dungeon_level}")
+    shift = len(str(dungeon_level))
+    console.print(x=x - shift, y=y, text=f"Floor {dungeon_level}")
 
 
 def render_names_at_mouse_location(

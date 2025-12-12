@@ -43,8 +43,14 @@ def main() -> None:
 
                 try:
                     for event in tcod.event.wait():
-                        context.convert_event(event)
-                        handler = handler.handle_events(event)
+                        context.convert_event(
+                            event
+                        )  # mouse pixel coords into tile coords
+                        if isinstance(handler, input_handlers.EventHandler):
+                            # pylint: disable-next=unexpected-keyword-arg
+                            handler = handler.handle_events(event, root_console)
+                        else:
+                            handler = handler.handle_events(event)
                 except Exception:  # Handle exceptions in game.
                     traceback.print_exc()  # Print error to stderr.
                     # Then print the error to the message log.
