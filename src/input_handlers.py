@@ -256,7 +256,10 @@ class AskUserEventHandler(EventHandler):
 
         self.x = (consts.SCREEN_WIDTH - self.frame_width) // 2
         self.y = (consts.SCREEN_HEIGHT - self.frame_height) // 2
-        self.title_x = self.x + self.frame_width // 2 - len(self.TITLE) // 2
+        if not isinstance(self.TITLE, str):
+            self.title_x = self.x + self.frame_width // 2
+        else:
+            self.title_x = self.x + self.frame_width // 2 - len(self.TITLE) // 2
         self.text_x = self.x + 2
         self.text_y = self.y + 2
 

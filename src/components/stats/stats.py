@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, overload, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, overload, Dict, Optional, Tuple, List
 
 import consts
 from components.stats.character_stat import CharacterStat
@@ -9,6 +9,7 @@ from components.stats.stat_mod_types import StatModType
 from components.stats.resource import Resource
 from components.stats.stat_types import StatTypes
 from components.stats.damage_types import DamageTypes
+from components.stats.damage import Damage
 from components.stats.initiative import Initiative
 from components.stats.damage_stats import ResistStats, DamageAmpStats, MasteryStats
 from components.equipment_types import EquipmentTypes
@@ -137,12 +138,12 @@ class Stats:
         return self.unarmed_attack.value
 
     @property
-    def damage(self) -> float:
-        return self.unarmed_damage.value
+    def damage(self) -> Damage:
+        return Damage({DamageTypes.BLUDGEONING: self.unarmed_damage.value})
 
     @property
-    def init_cost(self) -> int:
-        return self.unarmed_init_cost
+    def attack_init_cost(self) -> int:
+        return self.unarmed_init_cost * self.initiative.attack_multiplier
 
     @property
     def attack_range(self) -> int | None:

@@ -27,17 +27,18 @@ class Initiative:
         self.movement_speed = CharacterStat(base_value=1, name="BASE")
 
         _dex_speed = CharacterStat(base_value=self.parent.dexterity, name="BASE")
-        _dex_speed.add_modifier(
-            StatModifier(value=0.005, mod_type=StatModType.PERCENT_MULT, source="BASE")
-        )
-        _stat_mod = StatModifier(
-            value=_dex_speed, mod_type=StatModType.FLAT, source="BASE"
+
+        def _dex_speed_scaling(dex: CharacterStat) -> float:
+            return 1 - pow(0.995, dex.value)
+
+        _dex_scaling = StatModifier(
+            value=_dex_speed_scaling,
+            mod_type=StatModType.FUNC,
+            source="BASE",
+            depends_on=[_dex_speed],
         )
 
-        self.global_speed.add_modifier(_stat_mod)
-        self.attack_speed.add_modifier(_stat_mod)
-        self.casting_speed.add_modifier(_stat_mod)
-        self.movement_speed.add_modifier(_stat_mod)
+        self.global_speed.add_modifier(_dex_scaling)
 
     @property
     def attack_multiplier(self) -> float:

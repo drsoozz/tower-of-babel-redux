@@ -28,6 +28,9 @@ class CharacterStat:
         self.stat_modifiers.append(stat_mod)
         if isinstance(stat_mod.raw_value, CharacterStat):
             stat_mod.raw_value.dependents.append(self)
+        for dep in stat_mod.depends_on:
+            if isinstance(dep, CharacterStat):
+                dep.dependents.append(self)
         self.get_dirty()
 
     def remove_modifier(self, stat_mod: StatModifier) -> None:
@@ -83,7 +86,7 @@ class CharacterStat:
                 case StatModType.FLAT_RIGID:
                     flat_rigid += mod.value
                 case StatModType.FUNC:
-                    flat += mod.value()
+                    flat += mod.value
                 case _ as unexpected:
                     raise ValueError(f"Unhandled StatModType: {unexpected!r}")
         self._value = float((flat * (1 + percent_add)) * percent_mult + flat_rigid)

@@ -8,6 +8,7 @@ from components.stats.character_stat import CappedStat
 from components.stats.damage_types import DamageTypes
 from components.stats.stat_modifier import StatModifier
 from components.stats.stat_mod_types import StatModType
+from components.stats.stat_types import StatTypes
 
 if TYPE_CHECKING:
     from components.stats.stats import Stats
@@ -233,6 +234,12 @@ class BaseDamageStats:
             )
         except (KeyError, TypeError):
             pass
+
+    def multiplier(self, damage_type: DamageTypes = None) -> float:
+        raise NotImplementedError()
+
+    def get_stat(self, damage_type: DamageTypes) -> CappedStat:
+        return getattr(self, damage_type.normalized)
 
 
 class ResistStats(BaseDamageStats):
