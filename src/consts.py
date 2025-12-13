@@ -1,5 +1,10 @@
 from pathlib import Path
 
+from components.stats.stat_types import StatTypes
+from components.stats.stat_modifier import StatModifier
+from components.stats.stat_mod_types import StatModType
+from components.equipment_types import EquipmentTypes
+
 BASE_PATH = Path("src")
 TILESET_PATH = Path(BASE_PATH, "tilesets", "Dullard_Exponent_12x12.png")
 SCREEN_WIDTH = 128
@@ -14,3 +19,26 @@ TRUE_INIT_FACTOR = int(1e4)
 MAX_INIT = int(1e6)
 
 UPPER_RESIST_CAP = 0.75
+
+DEFAULT_DEFENSE_DICT = {
+    EquipmentTypes.HEAD: {
+        StatTypes.DEXTERITY: StatModifier(
+            value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
+        )
+    },
+    EquipmentTypes.TORSO: {
+        StatTypes.DEXTERITY: StatModifier(
+            value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
+        )
+    },
+    EquipmentTypes.LEGS: {
+        StatTypes.DEXTERITY: StatModifier(
+            value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
+        )
+    },
+    EquipmentTypes.FEET: {
+        StatTypes.DEXTERITY: StatModifier(
+            value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
+        )
+    },
+}

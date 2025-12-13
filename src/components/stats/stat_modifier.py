@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional
-from types import FunctionType
+from types import MethodType
 
 from components.stats.stat_mod_types import StatModType
 
@@ -30,7 +30,7 @@ class StatModifier:
 
     @property
     def is_dirty(self) -> bool:
-        if isinstance(self.raw_value, FunctionType):
+        if isinstance(self.raw_value, MethodType):
             return any(dep.check_if_dirty() for dep in self.depends_on)
         if self.is_complex:
             self.raw_value: CharacterStat
@@ -41,7 +41,7 @@ class StatModifier:
     @property
     def value(self) -> float:
         if self.is_complex:
-            if isinstance(self.raw_value, FunctionType):
+            if isinstance(self.raw_value, MethodType):
                 return self.raw_value(*(dep for dep in self.depends_on))
             return float(self.raw_value.value)
         return float(self.raw_value)

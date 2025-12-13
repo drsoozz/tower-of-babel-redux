@@ -13,6 +13,7 @@ from components.stats.damage import Damage
 from components.stats.initiative import Initiative
 from components.stats.damage_stats import ResistStats, DamageAmpStats, MasteryStats
 from components.equipment_types import EquipmentTypes
+from components.equippable import ArmorEquippable
 
 if TYPE_CHECKING:
     from components.fighter import Fighter
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
 
 
 class Stats:
+
     def __init__(
         self,
         *,
@@ -28,6 +30,10 @@ class Stats:
         damage_amps: Optional[Dict[DamageTypes, float]],
         damage_masteries: Dict[DamageTypes, float],
         parent: Fighter,
+        natural_defense_dict: Dict[
+            EquipmentTypes, Dict[StatTypes, StatModifier | List[StatModifier]]
+        ] = consts.DEFAULT_DEFENSE_DICT,
+        natural_weapon_dict: Dict[StatTypes, StatModifier | List[StatModifier]] = None,
     ):
         self.parent = parent
         self.strength = CharacterStat(
@@ -123,10 +129,22 @@ class Stats:
         self.damage_amps = DamageAmpStats(damage_types=damage_amps, parent=self)
         self.damage_masteries = MasteryStats(damage_types=damage_masteries, parent=self)
 
-        self.naked_head_defense = self._create_naked_defense()
-        self.naked_torso_defense = self._create_naked_defense()
-        self.naked_legs_defense = self._create_naked_defense()
-        self.naked_feet_defense = self._create_naked_defense()
+        self.naked_head_defense = ArmorEquippable(
+            equipment_type=EquipmentTypes.HEAD,
+            defense_mods=natural_defense_dict[EquipmentTypes.HEAD],
+        )
+        self.naked_torso_defense = ArmorEquippable(
+            equipment_type=EquipmentTypes.TORSO,
+            defense_mods=natural_defense_dict[EquipmentTypes.TORSO],
+        )
+        self.naked_legs_defense = ArmorEquippable(
+            equipment_type=EquipmentTypes.LEGS,
+            defense_mods=natural_defense_dict[EquipmentTypes.LEGS],
+        )
+        self.naked_feet_defense = ArmorEquippable(
+            equipment_type=EquipmentTypes.FEET,
+            defense_mods=natural_defense_dict[EquipmentTypes.FEET],
+        )
 
         self.unarmed_attack = self._create_naked_attack()
         self.unarmed_damage = self._create_naked_damage()
@@ -153,40 +171,40 @@ class Stats:
     def head_defense(self) -> float:
         item = self.parent.parent.equipment.slots.get(EquipmentTypes.HEAD)
         if item is None:
-            return self.naked_head_defense.value
+            return self.naked_head_defense.get_defense(self.parent.parent).value
         item_defense = item.equippable.get_defense(self.parent.parent)
         if item_defense is None:
-            return self.naked_head_defense.value
+            return self.naked_head_defense.get_defense(self.parent.parent).value
         return item_defense.value
 
     @property
     def torso_defense(self) -> float:
         item = self.parent.parent.equipment.slots.get(EquipmentTypes.TORSO)
         if item is None:
-            return self.naked_torso_defense.value
+            return self.naked_torso_defense.get_defense(self.parent.parent).value
         item_defense = item.equippable.get_defense(self.parent.parent)
         if item_defense is None:
-            return self.naked_torso_defense.value
+            return self.naked_torso_defense.get_defense(self.parent.parent).value
         return item_defense.value
 
     @property
     def legs_defense(self) -> float:
         item = self.parent.parent.equipment.slots.get(EquipmentTypes.LEGS)
         if item is None:
-            return self.naked_legs_defense.value
+            return self.naked_legs_defense.get_defense(self.parent.parent).value
         item_defense = item.equippable.get_defense(self.parent.parent)
         if item_defense is None:
-            return self.naked_legs_defense.value
+            return self.naked_legs_defense.get_defense(self.parent.parent).value
         return item_defense.value
 
     @property
     def feet_defense(self) -> float:
         item = self.parent.parent.equipment.slots.get(EquipmentTypes.FEET)
         if item is None:
-            return self.naked_feet_defense.value
+            return self.naked_feet_defense.get_defense(self.parent.parent).value
         item_defense = item.equippable.get_defense(self.parent.parent)
         if item_defense is None:
-            return self.naked_feet_defense.value
+            return self.naked_feet_defense.get_defense(self.parent.parent).value
         return item_defense.value
 
     @property

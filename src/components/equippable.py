@@ -21,9 +21,12 @@ class Equippable(BaseComponent):
     def __init__(
         self,
         equipment_type: EquipmentTypes | Tuple[EquipmentTypes, ...],
-        bonuses: Dict[
-            StatTypes | Tuple[StatTypes, DamageTypes], StatModifier | List[StatModifier]
-        ],
+        bonuses: Optional[
+            Dict[
+                StatTypes | Tuple[StatTypes, DamageTypes],
+                StatModifier | List[StatModifier],
+            ]
+        ] = None,
     ):
         self.equipment_type = equipment_type
         self.bonuses = bonuses
@@ -37,6 +40,8 @@ class Equippable(BaseComponent):
                 mod.source = self.parent  # assign the Item as the source
 
     def equip(self, actor: Actor) -> None:
+        if self.bonuses is not None:
+            return
         stats = actor.fighter.stats
         for stat_type, modifiers in self.bonuses.items():
             if not isinstance(modifiers, list):
@@ -46,6 +51,8 @@ class Equippable(BaseComponent):
                 stat.add_modifier(mod)
 
     def unequip(self, actor: Actor) -> None:
+        if self.bonuses is not None:
+            return
         stats = actor.fighter.stats
         for stat_type in self.bonuses:
             stat = stats.get_stat(stat_type)
@@ -63,9 +70,12 @@ class ArmorEquippable(Equippable):
     def __init__(
         self,
         equipment_type: EquipmentTypes,
-        bonuses: Dict[
-            StatTypes | Tuple[StatTypes, DamageTypes], StatModifier | List[StatModifier]
-        ],
+        bonuses: Optional[
+            Dict[
+                StatTypes | Tuple[StatTypes, DamageTypes],
+                StatModifier | List[StatModifier],
+            ]
+        ] = None,
         defense_mods: Dict[StatTypes, StatModifier | List[StatModifier]] = None,
     ):
         if equipment_type not in self.VALID_EQUIPMENT_TYPES:
@@ -73,19 +83,19 @@ class ArmorEquippable(Equippable):
                 f"Invalid armor slot: {equipment_type.value}. Must be one of {[slot.value for slot in self.VALID_EQUIPMENT_TYPES]}"
             )
         super().__init__(equipment_type, bonuses)
-        self._defense_mods = defense_mods or {}
+        self.defense_mods = defense_mods or {}
 
     def get_defense(self, actor: Actor) -> Optional[CharacterStat]:
         """
         Build the CharacterStat for this armor's defense from the modifiers dict.
         """
-        if self._defense_mods is None:
+        if self.defense_mods is None:
             return None
 
         defense = CharacterStat(base_value=0, name="DEFENSE")
 
         stats = actor.fighter.stats
-        for stat_type, modifiers in self.bonuses.items():
+        for stat_type, modifiers in self.defense_mods.items():
             if not isinstance(modifiers, list):
                 modifiers = [modifiers]
             stat = stats.get_stat(stat_type)
