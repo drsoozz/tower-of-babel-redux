@@ -197,31 +197,28 @@ class AttackAction(Action):
         self.engine.message_log.add_message(attack_desc)
 
         roll = random.random()
-        if roll < chance:
+        if roll < max(0.05, chance):
             # how much raw damage will be given if it is successful
-            damage = (
-                self.attacker.fighter.stats.damage
-                * self.attacker.fighter.stats.damage_amps.multiplier(
-                    DamageTypes.BLUDGEONING
-                )
-                * self.attacker.fighter.stats.damage_masteries.multiplier(
-                    DamageTypes.BLUDGEONING, CombatTypes.DAMAGE
-                )
-            )
+            damage = self.attacker.fighter.stats.damage.apply_boosts(self.attacker)
 
             # amount of damage actually received (between 0 and 1)
-            resist = self.defender.fighter.stats.damage_resists.multiplier(
-                DamageTypes.BLUDGEONING
-            ) * self.defender.fighter.stats.damage_masteries.multiplier(
-                DamageTypes.BLUDGEONING, CombatTypes.RESIST
+            final_damage = self.attacker.fighter.stats.damage.apply_resistances(
+                scaled_damage=damage, defender=self.defender
             )
 
-            final_damage = damage * resist
-            if final_damage > 0:
-                self.engine.message_log.add_message(
-                    f"The attack does {round_for_display(final_damage)} damage."
-                )
-                self.defender.fighter.hp -= final_damage
+            summed_damage = self.attacker.fighter.stats.damage.sum_damage_dict(
+                final_damage
+            )
+
+            print(self.attacker.name, self.attacker.fighter.stats.attack_init_cost)
+
+            if summed_damage > 0:
+                for damtype, damval in final_damage.items():
+                    damtype: DamageTypes
+                    self.engine.message_log.add_message(
+                        f"The attack does {round_for_display(damval)} {damtype.value.upper()} damage."
+                    )
+                    self.defender.fighter.hp -= damval
             else:
                 self.engine.message_log.add_message("The attack does no damage.")
 
@@ -229,9 +226,8 @@ class AttackAction(Action):
         else:
             self.engine.message_log.add_message("The attack missed!")
         self.apply_cost(
-            self.attacker.fighter.stats.init_cost
-            * self.attacker.fighter.stats.initiative.attack_multiplier
-        )
+            self.attacker.fighter.stats.attack_init_cost
+        )  # already accounts for speed multipliers
 
 
 class MeleeAction(ActionWithDirection):
