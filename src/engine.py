@@ -30,6 +30,13 @@ class Engine:
         self.mouse_location = (0, 0)
         self.player = player
 
+    def only_handle_player(self) -> None:
+        min_diff = (
+            consts.MAX_INIT - self.player.fighter.stats.initiative.initiative.value
+        )
+        if min_diff > 0:
+            self.player.fighter.stats.regenerate(min_diff)
+
     def handle_enemy_turns(self) -> Iterator[Entity]:
         while True:
             yield None
@@ -37,7 +44,8 @@ class Engine:
             if not self.player.is_alive:
                 return
 
-            sorted_entities = self.game_map.sorted_actors_by_initiative
+            else:
+                sorted_entities = self.game_map.sorted_actors_by_initiative
             if len(sorted_entities) == 0:
                 return
             min_diff = (
@@ -74,7 +82,6 @@ class Engine:
                     >= consts.MAX_INIT
                 ):
                     turn_order.append(entity)
-            print(sorted_entities[0].name)
 
             if not turn_order:
                 # No enemy reached max, but player wasn’t the top either
@@ -95,7 +102,6 @@ class Engine:
                     exceptions.Impossible
                 ):  # Ignore impossible action exceptions from AI.
                     WaitAction(entity).perform()
-                    print("!")
                 yield entity
 
     def update_fov(self) -> None:

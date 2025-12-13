@@ -42,6 +42,9 @@ def main() -> None:
                 context.present(root_console)
 
                 try:
+                    if isinstance(handler, input_handlers.LoopHandler):
+                        handler = handle_wait_handler(handler, context, root_console)
+                        continue
                     for event in tcod.event.wait():
                         context.convert_event(
                             event
@@ -51,6 +54,9 @@ def main() -> None:
                             handler = handler.handle_events(event, root_console)
                         else:
                             handler = handler.handle_events(event)
+                except exceptions.QuitToMainMenu:
+                    save_game(handler, "savegame.sav")
+                    handler = setup_game.MainMenu()
                 except Exception:  # Handle exceptions in game.
                     traceback.print_exc()  # Print error to stderr.
                     # Then print the error to the message log.
@@ -66,6 +72,27 @@ def main() -> None:
         except BaseException:  # Save on any other unexpected exception.
             save_game(handler, "savegame.sav")
             raise
+
+
+def handle_wait_handler(
+    handler: input_handlers.LoopHandler,
+    context: tcod.context.Context,
+    console: tcod.console.Console,
+):
+    # collect user input, if any
+    events = tcod.event.get()
+
+    for event in events:
+        context.convert_event(event)
+        new_handler = handler.handle_events(event, console)
+        if new_handler is not handler:
+            # wait was cancelled
+            return new_handler
+
+    # execute one rest tick
+    new_handler = handler.tick(console)
+
+    return new_handler
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import lzma
 import pickle
 import traceback
 from typing import Optional
+from pathlib import Path
 
 import tcod
 
@@ -54,6 +55,10 @@ def load_game(filename: str) -> Engine:
         engine = pickle.loads(lzma.decompress(f.read()))
     assert isinstance(engine, Engine)
     return engine
+
+
+def check_if_save_file_exists(filename: str) -> bool:
+    return Path(filename).is_file()
 
 
 class MainMenu(input_handlers.BaseEventHandler):
@@ -105,6 +110,9 @@ class MainMenu(input_handlers.BaseEventHandler):
                 traceback.print_exc()  # Print to stderr.
                 return input_handlers.PopupMessage(self, f"Failed to load save:\n{exc}")
         elif event.sym == tcod.event.KeySym.N:
-            return input_handlers.MainGameEventHandler(new_game())
+            if check_if_save_file_exists("savegame.sav"):
+                return input_handlers.AreYouSureToDeleteSave(self)
+            else:
+                return input_handlers.MainGameEventHandler(new_game())
 
         return None

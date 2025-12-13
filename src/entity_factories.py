@@ -9,12 +9,12 @@ from entity import Actor, Item
 from components.stats.stat_types import StatTypes
 
 player_stats = {
-    StatTypes.STRENGTH: 5,
-    StatTypes.DEXTERITY: 5,
-    StatTypes.CONSTITUTION: 5,
-    StatTypes.INTELLIGENCE: 5,
-    StatTypes.CUNNING: 5,
-    StatTypes.WILLPOWER: 5,
+    StatTypes.STRENGTH: 10,
+    StatTypes.DEXTERITY: 10,
+    StatTypes.CONSTITUTION: 10,
+    StatTypes.INTELLIGENCE: 10,
+    StatTypes.CUNNING: 10,
+    StatTypes.WILLPOWER: 10,
 }
 
 player = Actor(
@@ -23,7 +23,12 @@ player = Actor(
     name="Player",
     ai_cls=HostileEnemy,
     equipment=Equipment(),
-    fighter=Fighter(base_stats=player_stats),
+    fighter=Fighter(
+        base_stats=player_stats,
+        damage_resists=None,
+        damage_amps=None,
+        damage_masteries=None,
+    ),
     inventory=Inventory(capacity=26),
     level=Level(level_up_base=200),
 )
@@ -31,7 +36,7 @@ player = Actor(
 orc_stats = {
     StatTypes.STRENGTH: 3,
     StatTypes.DEXTERITY: 2,
-    StatTypes.CONSTITUTION: 2,
+    StatTypes.CONSTITUTION: 4,
     StatTypes.INTELLIGENCE: 1,
     StatTypes.CUNNING: 1,
     StatTypes.WILLPOWER: 1,
@@ -43,15 +48,20 @@ orc = Actor(
     name="Orc",
     ai_cls=HostileEnemy,
     equipment=Equipment(),
-    fighter=Fighter(base_stats=orc_stats),
+    fighter=Fighter(
+        base_stats=orc_stats,
+        damage_resists=None,
+        damage_amps=None,
+        damage_masteries=None,
+    ),
     inventory=Inventory(capacity=0),
     level=Level(xp_given=100),
 )
 
 troll_stats = {
-    StatTypes.STRENGTH: 5,
-    StatTypes.DEXTERITY: 1,
-    StatTypes.CONSTITUTION: 10,
+    StatTypes.STRENGTH: 15,
+    StatTypes.DEXTERITY: 3,
+    StatTypes.CONSTITUTION: 25,
     StatTypes.INTELLIGENCE: 1,
     StatTypes.CUNNING: 1,
     StatTypes.WILLPOWER: 1,
@@ -64,7 +74,12 @@ troll = Actor(
     name="Troll",
     ai_cls=HostileEnemy,
     equipment=Equipment(),
-    fighter=Fighter(base_stats=troll_stats),
+    fighter=Fighter(
+        base_stats=troll_stats,
+        damage_resists=None,
+        damage_amps=None,
+        damage_masteries=None,
+    ),
     inventory=Inventory(capacity=0),
     level=Level(xp_given=100),
 )

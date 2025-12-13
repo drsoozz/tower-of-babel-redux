@@ -41,6 +41,9 @@ class MessageLog:
         else:
             self.messages.append(Message(text, fg))
 
+    def add_blank(self) -> None:
+        self.add_message(" ", stack=False)
+
     def render(
         self,
         console: tcod.Console,

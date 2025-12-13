@@ -12,3 +12,5 @@ MAP_HEIGHT = int(SCREEN_HEIGHT * 0.9)
 TRUE_INIT_FACTOR = int(1e4)
 # factor to divide by when going from initiative to multiplier to regen value
 MAX_INIT = int(1e6)
+
+UPPER_RESIST_CAP = 0.75

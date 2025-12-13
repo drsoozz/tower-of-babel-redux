@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class StatTypes(Enum):
+class StatTypes(str, Enum):
     # extend as needed
     STRENGTH = "Strength"
     DEXTERITY = "Dexterity"

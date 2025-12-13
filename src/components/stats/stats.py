@@ -1,23 +1,32 @@
 from __future__ import annotations
 
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING
 
 import consts
 from components.stats.character_stat import CharacterStat
 from components.stats.stat_modifier import StatModifier
 from components.stats.stat_mod_types import StatModType
-from components.stats.resource import Resource, HPResource
+from components.stats.resource import Resource
 from components.stats.stat_types import StatTypes
+from components.stats.damage_types import DamageTypes
 from components.stats.initiative import Initiative
+from components.stats.damage_stats import ResistStats, DamageAmpStats, MasteryStats
 
 if TYPE_CHECKING:
     from components.fighter import Fighter
 
 
 class Stats:
-    def __init__(self, *, base_stats: Dict[StatTypes, int | float], parent: Fighter):
+    def __init__(
+        self,
+        *,
+        base_stats: Dict[StatTypes, int | float],
+        damage_resists: Optional[Dict[DamageTypes, float]],
+        damage_amps: Optional[Dict[DamageTypes, float]],
+        damage_masteries: Dict[DamageTypes, float],
+        parent: Fighter,
+    ):
         self.parent = parent
-        self.is_dirty = True
         self.strength = CharacterStat(
             base_value=base_stats[StatTypes.STRENGTH], name=StatTypes.STRENGTH.value
         )
@@ -51,20 +60,20 @@ class Stats:
                 base_value=base_stats[StatTypes.HP],
                 name=StatTypes.HP.value,
             )
-        except KeyError:
+        except (KeyError, TypeError):
             self.hp = self._create_hp()
         try:
             self.energy = Resource(
                 base_value=base_stats[StatTypes.ENERGY], name=StatTypes.ENERGY.value
             )
-        except KeyError:
+        except (KeyError, TypeError):
             self.energy = self._create_energy()
 
         try:
             self.mana = Resource(
                 base_value=base_stats[StatTypes.MANA], name=StatTypes.MANA.value
             )
-        except KeyError:
+        except (KeyError, TypeError):
             self.mana = self._create_mana()
 
         try:
@@ -72,7 +81,7 @@ class Stats:
                 base_value=base_stats[StatTypes.CARRYING_CAPACITY],
                 name=StatTypes.CARRYING_CAPACITY.value,
             )
-        except KeyError:
+        except (KeyError, TypeError):
             self.carrying_capacity = self._create_carrying_capacity()
 
         try:
@@ -80,14 +89,14 @@ class Stats:
                 base_value=base_stats[StatTypes.ENCUMBRANCE],
                 name=StatTypes.ENCUMBRANCE.value,
             )
-        except KeyError:
+        except (KeyError, TypeError):
             self.encumbrance = self._create_encumbrance()
 
         try:
             self.hp_regen = CharacterStat(
                 base_value=base_stats[StatTypes.HP_REGEN], name=StatTypes.HP_REGEN.value
             )
-        except KeyError:
+        except (KeyError, TypeError):
             self.hp_regen = self._create_health_regen()
 
         try:
@@ -95,7 +104,7 @@ class Stats:
                 base_value=base_stats[StatTypes.ENERGY_REGEN],
                 name=StatTypes.ENERGY_REGEN.value,
             )
-        except KeyError:
+        except (KeyError, TypeError):
             self.energy_regen = self._create_energy_regen()
 
         try:
@@ -103,7 +112,7 @@ class Stats:
                 base_value=base_stats[StatTypes.MANA_REGEN],
                 name=StatTypes.MANA_REGEN.value,
             )
-        except KeyError:
+        except (KeyError, TypeError):
             self.mana_regen = self._create_mana_regen()
 
         self.naked_head_defense = self._create_naked_defense()
@@ -112,9 +121,15 @@ class Stats:
         self.naked_feet_defense = self._create_naked_defense()
 
         self.initiative = Initiative(self)
+        self.damage_resists = ResistStats(damage_types=damage_resists, parent=self)
+        self.damage_amps = DamageAmpStats(damage_types=damage_amps, parent=self)
+        self.damage_masteries = MasteryStats(damage_types=damage_masteries, parent=self)
 
     def regenerate(self, diff: int) -> None:
         self.initiative.initiative.modify(diff, sudo=True)
+
+        # initiative is stored as a giant int, this scales it down correctly to be a value that is
+        # typically between 0 and 1, which it expects. regen is slow!
         time_factor = diff / consts.MAX_INIT
         self.hp.regenerate(time_factor=time_factor, regen=self.hp_regen.value)
         self.energy.regenerate(time_factor=time_factor, regen=self.energy_regen.value)
@@ -262,8 +277,6 @@ class Stats:
         # ^ the lessen to take away is to never try to MODIFY StatModifiers, thats not best practices
         # instead, make new ones for each object! so much easier
 
-        # TODO: energy and mana regen (remember both are affected by WIL!)
-
         return hp_regen
 
     def _create_energy_regen(self) -> CharacterStat:
@@ -345,3 +358,12 @@ class Stats:
     @property
     def feet_defense(self) -> float:
         return self.naked_feet_defense.value
+
+    @property
+    def total_defense(self) -> float:
+        return (
+            self.head_defense
+            + self.chest_defense
+            + self.legs_defense
+            + self.feet_defense
+        )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Optional
 
 import color
 from components.base_component import BaseComponent
@@ -8,6 +8,7 @@ from render_order import RenderOrder
 from components.stats.stats import Stats
 from components.stats.stat_modifier import StatModifier
 from components.stats.stat_mod_types import StatModType
+from components.stats.damage_types import DamageTypes
 
 if TYPE_CHECKING:
     from entity import Actor
@@ -17,14 +18,26 @@ if TYPE_CHECKING:
 class Fighter(BaseComponent):
     parent: Actor
 
-    def __init__(self, base_stats: Dict[StatTypes, int | float]):
+    def __init__(
+        self,
+        base_stats: Dict[StatTypes, int | float],
+        damage_resists: Optional[Dict[DamageTypes, float]],
+        damage_amps: Optional[Dict[DamageTypes, float]],
+        damage_masteries: Dict[DamageTypes, float],
+    ):
 
-        self.stats = Stats(base_stats=base_stats, parent=self)
+        self.stats = Stats(
+            base_stats=base_stats,
+            damage_resists=damage_resists,
+            damage_amps=damage_amps,
+            damage_masteries=damage_masteries,
+            parent=self,
+        )
 
     def init_hook(self) -> None:
         if self.parent.name == "Player":
             self.stats.hp.max.add_modifier(
-                StatModifier(value=10, mod_type=StatModType.FLAT, source="BASE")
+                StatModifier(value=5, mod_type=StatModType.FLAT, source="BASE")
             )
             self.stats.hp.maximize()
 

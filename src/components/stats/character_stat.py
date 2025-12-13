@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 from components.stats.stat_mod_types import StatModType
 from components.stats.stat_modifier import StatModifier
@@ -102,3 +102,52 @@ class CharacterStat:
             if self.raw_base_value.check_if_dirty():
                 return True
         return self.is_dirty or any(mod.is_dirty for mod in self.stat_modifiers)
+
+
+class CappedStat(CharacterStat):
+
+    def __init__(
+        self,
+        *,
+        base_value: int | float | CharacterStat,
+        name: str,
+        upper_cap: Optional[int | float | CharacterStat],
+        lower_cap: Optional[int | float | CharacterStat],
+    ):
+        super().__init__(base_value=base_value, name=name)
+
+        self.raw_upper_cap = upper_cap
+        self.raw_lower_cap = lower_cap
+
+        self.upper_cap_is_complex = isinstance(upper_cap, CharacterStat)
+        self.lower_cap_is_complex = isinstance(lower_cap, CharacterStat)
+
+        if self.upper_cap_is_complex:
+            upper_cap.dependents.append(self)
+        if self.lower_cap_is_complex:
+            lower_cap.dependents.append(self)
+
+        self.get_dirty()
+
+    @property
+    def upper_cap(self) -> Optional[float]:
+        if self.raw_upper_cap is None:
+            return None
+        if self.upper_cap_is_complex:
+            return self.raw_upper_cap.value
+        return self.raw_upper_cap
+
+    @property
+    def lower_cap(self) -> Optional[float]:
+        if self.raw_lower_cap is None:
+            return None
+        if self.lower_cap_is_complex:
+            return self.raw_lower_cap.value
+        return self.raw_lower_cap
+
+    @property
+    def value(self) -> float:
+        value = super().value
+        value = max(self.lower_cap, value) if self.lower_cap is not None else value
+        value = min(self.upper_cap, value) if self.upper_cap is not None else value
+        return value

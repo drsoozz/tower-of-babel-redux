@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import time
 from typing import Optional, Tuple, TYPE_CHECKING
+import random
 
 import color
 import consts
+from combat_types import CombatTypes
 import exceptions
+from components.stats.damage_types import DamageTypes
 
 
 if TYPE_CHECKING:
@@ -108,15 +111,26 @@ class EquipAction(Action):
 
 
 class WaitAction(Action):
-    def perform(self, from_error: bool = False) -> None:
-        if self.entity == self.engine.player:
+    def perform(
+        self,
+        from_error: bool = False,
+        looped_wait: bool = False,
+        time_to_wait: int = consts.MAX_INIT // 2,
+    ) -> None:
+        if looped_wait:
+            pass
+        elif self.entity == self.engine.player:
             time.sleep(0.05)
-        else:
-            time.sleep(0.001)
+
         if from_error:
-            self.apply_cost(1e5)
+            self.apply_cost(consts.MAX_INIT // 5)
         else:
-            self.apply_cost(5e5)
+            self.apply_cost(time_to_wait)
+
+
+class QueryWaitAction(WaitAction):
+    def perform(self, from_error=False, looped_wait=True):
+        super().perform(from_error, looped_wait)
 
 
 class TakeStairsAction(Action):
@@ -161,6 +175,61 @@ class ActionWithDirection(Action):
         raise NotImplementedError()
 
 
+class AttackAction(Action):
+    def __init__(self, attacker: Actor, defender: Actor):
+        super().__init__(attacker)
+        self.attacker = attacker
+        self.defender = defender
+
+    def perform(self) -> None:
+        self.engine.message_log.add_blank()
+
+        # attack rating (higher means more likely to hit)
+        attack = self.attacker.fighter.stats.dexterity.value
+
+        # defense rating (higher means less likely to hit)
+        defense = self.defender.fighter.stats.total_defense
+
+        chance = 0.5 + (attack - defense) * 0.025
+
+        attack_desc = f"{self.attacker.name.capitalize()} attacks {self.defender.name.capitalize()}."
+        self.engine.message_log.add_message(attack_desc)
+
+        roll = random.random()
+        if roll < chance:
+            # how much raw damage will be given if it is successful
+            damage = (
+                self.attacker.fighter.stats.strength.value
+                * self.attacker.fighter.stats.damage_amps.multiplier(
+                    DamageTypes.BLUDGEONING
+                )
+                * self.attacker.fighter.stats.damage_masteries.multiplier(
+                    DamageTypes.BLUDGEONING, CombatTypes.DAMAGE
+                )
+            )
+
+            # amount of damage actually received (between 0 and 1)
+            resist = self.defender.fighter.stats.damage_resists.multiplier(
+                DamageTypes.BLUDGEONING
+            ) * self.defender.fighter.stats.damage_masteries.multiplier(
+                DamageTypes.BLUDGEONING, CombatTypes.RESIST
+            )
+
+            final_damage = damage * resist
+            if final_damage > 0:
+                self.engine.message_log.add_message(
+                    f"The attack does {final_damage} damage."
+                )
+                self.defender.fighter.hp -= final_damage
+            else:
+                self.engine.message_log.add_message("The attack does no damage.")
+
+            # print(attack, defense, chance, roll, damage, resist, final_damage)
+        else:
+            self.engine.message_log.add_message("The attack missed!")
+        self.apply_cost(5e5 * self.attacker.fighter.stats.initiative.attack_multiplier)
+
+
 class MeleeAction(ActionWithDirection):
 
     # TODO: eventually redo this when adding more than just base stats
@@ -170,21 +239,7 @@ class MeleeAction(ActionWithDirection):
         if not target:
             raise exceptions.Impossible("Nothing to attack.")
 
-        damage = (
-            self.entity.fighter.stats.strength.value
-            - target.fighter.stats.dexterity.value / 10
-        )
-
-        attack_desc = (
-            f"{self.entity.name.capitalize()} attacks {target.name.capitalize()}"
-        )
-        if damage > 0:
-            print(f"{attack_desc} for {damage} hit points.")
-            target.fighter.hp -= damage
-        else:
-            print(f"{attack_desc} but does no damage.")
-
-        self.apply_cost(5e5 * self.entity.fighter.stats.initiative.attack_multiplier)
+        AttackAction(attacker=self.entity, defender=target).perform()
 
 
 class MovementAction(ActionWithDirection):

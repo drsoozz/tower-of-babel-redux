@@ -9,13 +9,14 @@ import tcod
 import actions
 from actions import Action, BumpAction, PickupAction, WaitAction
 import color
+import consts
 import exceptions
 from components.stats.stat_types import StatTypes
+from render_functions import round_for_display
 
 if TYPE_CHECKING:
     from engine import Engine
     from entity import Item
-
 MOVE_KEYS = {
     # Arrow keys.
     tcod.event.KeySym.UP: (0, -1),
@@ -131,6 +132,47 @@ class PopupMessage(BaseEventHandler):
         return self.parent
 
 
+class AreYouSureToDeleteSave(PopupMessage):
+    def __init__(self, parent_handler):
+        super().__init__(parent_handler, text="")
+
+    def on_render(self, console):
+        self.parent.on_render(console)
+        console.rgb["fg"] //= 8
+        console.rgb["bg"] //= 8
+
+        console.print(
+            console.width // 2,
+            console.height // 2 - 4,
+            "Are you sure you want to delete your save?",
+            fg=color.white.rgb,
+            bg=color.black.rgb,
+            alignment=tcod.libtcodpy.CENTER,
+        )
+
+        menu_width = 24
+        for i, text in enumerate(["[Y] Yes", "[N] No"]):
+            console.print(
+                console.width // 2,
+                console.height // 2 - 2 + i,
+                text.ljust(menu_width),
+                fg=color.menu_text.rgb,
+                bg=color.black.rgb,
+                alignment=tcod.libtcodpy.CENTER,
+                bg_blend=tcod.libtcodpy.BKGND_ALPHA(64),
+            )
+
+    def _handle_key(self, event: tcod.event.KeyDown):
+        key = event.sym
+        from setup_game import new_game
+
+        if key == tcod.event.KeySym.Y:
+            return MainGameEventHandler(new_game())
+        if key == tcod.event.KeySym.N:
+            return self.parent
+        return None
+
+
 class EventHandler(BaseEventHandler):
     """Base interface for input handlers."""
 
@@ -169,7 +211,6 @@ class EventHandler(BaseEventHandler):
         except exceptions.Impossible as exc:
             self.engine.message_log.add_message(exc.args[0], color.impossible.rgb)
             return False  # Skip enemy turn on exceptions.
-
         for _ in self.engine.handle_enemy_turns():
             self.engine.update_fov()
             self.on_render(console)
@@ -186,6 +227,38 @@ class EventHandler(BaseEventHandler):
 
 class AskUserEventHandler(EventHandler):
     """Handles user input for actions which require special input."""
+
+    def __init__(
+        self,
+        engine,
+        frame_width: Optional[int],
+        frame_height: Optional[int],
+        title: str = None,
+        question: str = None,
+    ):
+        super().__init__(engine)
+
+        self.TITLE = title
+        self.QUESTION = question
+
+        if frame_width is None:
+            if question is None:
+                self.frame_width = 15
+            else:
+                self.frame_width = len(question) + 4
+        else:
+            self.frame_width = frame_width
+
+        if frame_height is None:
+            self.frame_height = consts.SCREEN_HEIGHT // 2
+        else:
+            self.frame_height = frame_height
+
+        self.x = (consts.SCREEN_WIDTH - self.frame_width) // 2
+        self.y = (consts.SCREEN_HEIGHT - self.frame_height) // 2
+        self.title_x = self.x + self.frame_width // 2 - len(self.TITLE) // 2
+        self.text_x = self.x + 2
+        self.text_y = self.y + 2
 
     def _handle_key(self, event: tcod.event.KeyDown) -> Optional[ActionOrHandler]:
         """By default any key exits this input handler."""
@@ -208,130 +281,311 @@ class AskUserEventHandler(EventHandler):
         return MainGameEventHandler(self.engine)
 
 
-class CharacterScreenEventHandler(AskUserEventHandler):
-    TITLE = "Character Information"
+class EscapeMenuEventHandler(AskUserEventHandler):
+    def __init__(self, engine: Engine):
+        TITLE = "MAIN MENU"
 
-    def on_render(self, console: tcod.Console) -> None:
+        super().__init__(
+            engine, frame_width=None, frame_height=None, title=TITLE, question=None
+        )
+
+        self.x = 0
+        self.y = 0
+        self.frame_width = consts.SCREEN_WIDTH
+        self.frame_height = consts.SCREEN_HEIGHT
+        self.title_x = self.x + self.frame_width // 2 - len(self.TITLE) // 2
+        self.title_y = 2
+        self.text_x = self.title_x
+        self.text_y = self.title_y + 10
+        self.menu_width = 24
+
+    def on_render(self, console: tcod.console.Console) -> None:
         super().on_render(console)
 
-        if self.engine.player.x <= 30:
-            x = 40
-        else:
-            x = 0
+        console.draw_frame(
+            x=self.x,
+            y=self.y,
+            width=self.frame_width,
+            height=self.frame_height,
+            clear=True,
+            fg=(255, 255, 255),
+            bg=(0, 0, 0),
+        )
+        console.print(self.title_x, self.y, self.TITLE)
 
-        y = 0
+        for i, text in enumerate(["[ESC] Return to game", "[X] Quit to Main Menu"]):
+            console.print(
+                console.width // 2,
+                console.height // 2 - 2 + i,
+                text.ljust(self.menu_width),
+                fg=color.menu_text.rgb,
+                bg=color.black.rgb,
+                alignment=tcod.libtcodpy.CENTER,
+                bg_blend=tcod.libtcodpy.BKGND_ALPHA(64),
+            )
 
-        width = len(self.TITLE) + 4
+    def _handle_key(self, event):
+        key = event.sym
+        if key == tcod.event.KeySym.X:
+            raise exceptions.QuitToMainMenu()
+        if key == tcod.event.KeySym.ESCAPE:
+            return MainGameEventHandler(self.engine)
+        return None
+
+
+class CharacterScreenEventHandler(AskUserEventHandler):
+
+    def __init__(self, engine):
+        TITLE = "CHARACTER INFORMATION"
+        QUESTION = ""
+        frame_width = 50
+        frame_height = 25
+
+        super().__init__(
+            engine,
+            frame_width=frame_width,
+            frame_height=frame_height,
+            title=TITLE,
+            question=QUESTION,
+        )
+
+    def on_render(self, console: tcod.console.Console) -> None:
+        super().on_render(console)
 
         console.draw_frame(
-            x=x,
-            y=y,
-            width=width,
-            height=10,
-            title=self.TITLE,
+            x=self.x,
+            y=self.y,
+            width=self.frame_width,
+            height=self.frame_height,
             clear=True,
             fg=(255, 255, 255),
             bg=(0, 0, 0),
         )
 
+        console.print(self.title_x, self.y, self.TITLE)
+
         console.print(
-            x=x + 1, y=y + 1, string=f"Level: {self.engine.player.level.current_level}"
+            x=self.text_x,
+            y=self.text_y,
+            text=f"Level: {self.engine.player.level.current_level}",
         )
         console.print(
-            x=x + 1, y=y + 2, string=f"XP: {self.engine.player.level.current_xp}"
-        )
-        console.print(
-            x=x + 1,
-            y=y + 3,
-            string=f"XP for next Level: {self.engine.player.level.experience_to_next_level}",
+            x=self.text_x,
+            y=self.text_y + 1,
+            text=f"XP: {self.engine.player.level.current_xp} / {self.engine.player.level.experience_to_next_level}",
         )
 
         console.print(
-            x=x + 1,
-            y=y + 4,
-            string=f"Strength: {self.engine.player.fighter.stats.strength.value}",
+            x=self.text_x,
+            y=self.text_y + 3,
+            text=f"Strength: {round_for_display(self.engine.player.fighter.stats.strength.value)}",
         )
         console.print(
-            x=x + 1,
-            y=y + 5,
-            string=f"Dexterity: {self.engine.player.fighter.stats.dexterity.value}",
+            x=self.text_x,
+            y=self.text_y + 4,
+            text=f"Dexterity: {round_for_display(self.engine.player.fighter.stats.dexterity.value)}",
         )
         console.print(
-            x=x + 1,
-            y=y + 6,
-            string=f"Constitution: {self.engine.player.fighter.stats.constitution.value}",
+            x=self.text_x,
+            y=self.text_y + 5,
+            text=f"Constitution: {round_for_display(self.engine.player.fighter.stats.constitution.value)}",
         )
         console.print(
-            x=x + 1,
-            y=y + 7,
-            string=f"Intelligence: {self.engine.player.fighter.stats.intelligence.value}",
+            x=self.text_x,
+            y=self.text_y + 6,
+            text=f"Intelligence: {round_for_display(self.engine.player.fighter.stats.intelligence.value)}",
         )
         console.print(
-            x=x + 1,
-            y=y + 8,
-            string=f"Cunning: {self.engine.player.fighter.stats.cunning.value}",
+            x=self.text_x,
+            y=self.text_y + 7,
+            text=f"Cunning: {round_for_display(self.engine.player.fighter.stats.cunning.value)}",
         )
         console.print(
-            x=x + 1,
-            y=y + 9,
-            string=f"Willpower: {self.engine.player.fighter.stats.willpower.value}",
+            x=self.text_x,
+            y=self.text_y + 8,
+            text=f"Willpower: {round_for_display(self.engine.player.fighter.stats.willpower.value)}",
         )
+
+
+class LoopHandler(EventHandler):
+    def __init__(self, engine, remaining_time: int, until_full: bool = False):
+        super().__init__(engine)
+        self.remaining_time = remaining_time
+        self.until_full = until_full
+
+        self.quick = True
+        for actor in self.engine.game_map.actors:
+            if (
+                self.engine.game_map.visible[actor.x, actor.y]
+                and actor.is_alive
+                and actor != self.engine.player
+            ):
+                self.quick = False
+        print(self.quick)
+
+    def tick(self, console: tcod.console.Console):
+        if self.until_full:
+            if (
+                self.engine.player.fighter.stats.hp.value
+                == self.engine.player.fighter.stats.hp.max_value
+            ):
+                return MainGameEventHandler(self.engine)
+        if (
+            self.remaining_time is not None and self.remaining_time <= 0
+        ) or not self.engine.player.is_alive:
+            return MainGameEventHandler(self.engine)
+
+        time_spent = self.perform(quick=self.quick)
+        if self.remaining_time is not None:
+            self.remaining_time -= time_spent
+
+        if self.quick:
+            self.engine.only_handle_player()
+        else:
+            for _ in self.engine.handle_enemy_turns():
+                self.on_render(console)
+                self.engine.update_fov()
+        self.on_render(console)
+        self.engine.update_fov()
+
+        return self
+
+    def perform(self, quick: bool = False):
+        raise NotImplementedError()
+
+
+class LoopedRestHandler(LoopHandler):
+    def perform(self, quick: bool = False):
+
+        if quick:
+            time_spent = consts.MAX_INIT * 25
+        else:
+            time_spent = consts.MAX_INIT
+
+        WaitAction(self.engine.player).perform(
+            looped_wait=True, time_to_wait=time_spent
+        )
+        return time_spent
+
+    def _handle_key(self, event):
+        key = event.sym
+        if key == tcod.event.KeySym.ESCAPE:
+            return MainGameEventHandler(self.engine)
+        return None
+
+
+class QueryRestLoopHandler(AskUserEventHandler):
+
+    def __init__(self, engine):
+        TITLE = "ADVANCED REST OPTIONS"
+        QUESTION = "How long do you want to rest?"
+        frame_height = 25
+        super().__init__(
+            engine,
+            frame_width=None,  # default
+            frame_height=frame_height,
+            title=TITLE,
+            question=QUESTION,
+        )
+
+    def on_render(self, console: tcod.console.Console) -> None:
+        super().on_render(console)
+
+        console.draw_frame(
+            x=self.x,
+            y=self.y,
+            width=self.frame_width,
+            height=self.frame_height,
+            clear=True,
+            fg=(255, 255, 255),
+            bg=(0, 0, 0),
+        )
+        console.print(self.title_x, self.y, self.TITLE)
+
+        console.print(self.x + 2, self.y + 2, text=self.QUESTION)
+        console.print(self.x + 2, self.y + 4, text="1) 100 Turns")
+        console.print(self.x + 2, self.y + 5, text="2) 500 Turns")
+        console.print(self.x + 2, self.y + 6, text="3) 1000 Turns")
+        console.print(self.x + 2, self.y + 7, text="4) Until fully healed")
+
+    def _handle_key(self, event):
+        key = event.sym
+        if key == tcod.event.KeySym.N1:
+            n = 100 * consts.MAX_INIT
+        elif key == tcod.event.KeySym.N2:
+            n = 500 * consts.MAX_INIT
+        elif key == tcod.event.KeySym.N3:
+            n = 1000 * consts.MAX_INIT
+        elif key == tcod.event.KeySym.N4:
+            return LoopedRestHandler(self.engine, remaining_time=None, until_full=True)
+        else:
+            n = None
+
+        if n is not None:
+            return LoopedRestHandler(self.engine, remaining_time=n)
+        return super()._handle_key(event)
 
 
 class LevelUpEventHandler(AskUserEventHandler):
-    TITLE = "Level Up"
 
-    def on_render(self, console: tcod.Console) -> None:
+    def __init__(self, engine):
+        TITLE = "LEVEL UP"
+        QUESTION = "You have leveled up! Select an attribute to increase."
+        frame_height = 25
+
+        super().__init__(
+            engine,
+            frame_width=None,
+            frame_height=frame_height,
+            title=TITLE,
+            question=QUESTION,
+        )
+
+    def on_render(self, console: tcod.console.Console) -> None:
         super().on_render(console)
 
-        if self.engine.player.x <= 30:
-            x = 40
-        else:
-            x = 0
-
         console.draw_frame(
-            x=x,
-            y=0,
-            width=35,
-            height=11,
-            title=self.TITLE,
+            x=self.x,
+            y=self.y,
+            width=self.frame_width,
+            height=self.frame_height,
             clear=True,
             fg=(255, 255, 255),
             bg=(0, 0, 0),
         )
+        console.print(self.title_x, self.y, self.TITLE)
 
-        console.print(x=x + 1, y=1, string="Congratulations! You level up!")
-        console.print(x=x + 1, y=2, string="Select an attribute to increase.")
+        console.print(x=self.text_x, y=self.text_y, text=self.QUESTION)
 
         console.print(
-            x=x + 1,
-            y=4,
-            string=f"1) Strength ({self.engine.player.fighter.stats.strength.value} -> {self.engine.player.fighter.stats.strength.preview_value})",
+            x=self.text_x,
+            y=self.text_y + 1,
+            text=f"1) Strength ({round_for_display(self.engine.player.fighter.stats.strength.value)} -> {round_for_display(self.engine.player.fighter.stats.strength.preview_value)})",
         )
         console.print(
-            x=x + 1,
-            y=5,
-            string=f"2) Dexterity ({self.engine.player.fighter.stats.dexterity.value} -> {self.engine.player.fighter.stats.dexterity.preview_value})",
+            x=self.text_x,
+            y=self.text_y + 2,
+            text=f"2) Dexterity ({round_for_display(self.engine.player.fighter.stats.dexterity.value)} -> {round_for_display(self.engine.player.fighter.stats.dexterity.preview_value)})",
         )
         console.print(
-            x=x + 1,
-            y=6,
-            string=f"3) Constitution ({self.engine.player.fighter.stats.constitution.value} -> {self.engine.player.fighter.stats.constitution.preview_value})",
+            x=self.text_x,
+            y=self.text_y + 3,
+            text=f"3) Constitution ({round_for_display(self.engine.player.fighter.stats.constitution.value)} -> {round_for_display(self.engine.player.fighter.stats.constitution.preview_value)})",
         )
         console.print(
-            x=x + 1,
-            y=7,
-            string=f"4) Intelligence ({self.engine.player.fighter.stats.intelligence.value} -> {self.engine.player.fighter.stats.intelligence.preview_value})",
+            x=self.text_x,
+            y=self.text_y + 4,
+            text=f"4) Intelligence ({round_for_display(self.engine.player.fighter.stats.intelligence.value)} -> {round_for_display(self.engine.player.fighter.stats.intelligence.preview_value)})",
         )
         console.print(
-            x=x + 1,
-            y=8,
-            string=f"5) Cunning ({self.engine.player.fighter.stats.cunning.value} -> {self.engine.player.fighter.stats.cunning.preview_value})",
+            x=self.text_x,
+            y=self.text_y + 5,
+            text=f"5) Cunning ({round_for_display(self.engine.player.fighter.stats.cunning.value)} -> {round_for_display(self.engine.player.fighter.stats.cunning.preview_value)})",
         )
         console.print(
-            x=x + 1,
-            y=9,
-            string=f"6) Willpower ({self.engine.player.fighter.stats.willpower.value} -> {self.engine.player.fighter.stats.willpower.preview_value})",
+            x=self.text_x,
+            y=self.text_y + 6,
+            text=f"6) Willpower ({round_for_display(self.engine.player.fighter.stats.willpower.value)} -> {round_for_display(self.engine.player.fighter.stats.willpower.preview_value)})",
         )
 
     def _handle_key(self, event: tcod.event.KeyDown) -> Optional[ActionOrHandler]:
@@ -361,42 +615,44 @@ class InventoryEventHandler(AskUserEventHandler):
     What happens then depends on the subclass.
     """
 
-    TITLE = "<missing title>"
+    def __init__(self, engine: Engine, question: str):
+        TITLE = "INVENTORY"
+        if len(engine.player.inventory.items) == 0:
+            longest_item_name = 0
+        else:
+            longest_item_name = (
+                max(len(item.name) for item in engine.player.inventory.items) + 10
+            )
+        frame_width = max(len(TITLE) + 4, longest_item_name)
+        self.number_of_items_in_inventory = len(engine.player.inventory.items)
+        frame_height = max(5, self.number_of_items_in_inventory + 4)
+        super().__init__(
+            engine,
+            frame_width=frame_width,
+            frame_height=frame_height,
+            title=TITLE,
+            question=question,
+        )
 
-    def on_render(self, console: tcod.Console) -> None:
+    def on_render(self, console: tcod.console.Console) -> None:
         """Render an inventory menu, which displays the items in the inventory, and the letter to select them.
         Will move to a different position based on where the player is located, so the player can always see where
         they are.
         """
         super().on_render(console)
-        number_of_items_in_inventory = len(self.engine.player.inventory.items)
-
-        height = number_of_items_in_inventory + 2
-
-        if height <= 3:
-            height = 3
-
-        if self.engine.player.x <= 30:
-            x = 40
-        else:
-            x = 0
-
-        y = 0
-
-        width = len(self.TITLE) + 4
 
         console.draw_frame(
-            x=x,
-            y=y,
-            width=width,
-            height=height,
-            title=self.TITLE,
+            x=self.x,
+            y=self.y,
+            width=self.frame_width,
+            height=self.frame_height,
             clear=True,
             fg=(255, 255, 255),
             bg=(0, 0, 0),
         )
+        console.print(self.title_x, self.y, self.TITLE)
 
-        if number_of_items_in_inventory > 0:
+        if self.number_of_items_in_inventory > 0:
             for i, item in enumerate(self.engine.player.inventory.items):
                 item_key = chr(ord("a") + i)
                 is_equipped = self.engine.player.equipment.item_is_equipped(item)
@@ -406,9 +662,9 @@ class InventoryEventHandler(AskUserEventHandler):
                 if is_equipped:
                     item_string = f"{item_string} (E)"
 
-                console.print(x + 1, y + i + 1, item_string)
+                console.print(self.text_x, self.text_y + i, item_string)
         else:
-            console.print(x + 1, y + 1, "(Empty)")
+            console.print(self.text_x, self.text_y, "(Empty)")
 
     def _handle_key(self, event: tcod.event.KeyDown) -> Optional[ActionOrHandler]:
         player = self.engine.player
@@ -432,11 +688,12 @@ class InventoryEventHandler(AskUserEventHandler):
 class InventoryActivateHandler(InventoryEventHandler):
     """Handle using an inventory item."""
 
-    TITLE = "Select an item to use"
+    def __init__(self, engine):
+        QUESTION = "Select an item to use"
+        super().__init__(engine, question=QUESTION)
 
     def on_item_selected(self, item: Item) -> Optional[ActionOrHandler]:
         """Return the action for the selected item."""
-        print("!")
         if item.consumable:
             # Return the action for the selected item.
             return item.consumable.get_action(self.engine.player)
@@ -449,7 +706,9 @@ class InventoryActivateHandler(InventoryEventHandler):
 class InventoryDropHandler(InventoryEventHandler):
     """Handle dropping an inventory item."""
 
-    TITLE = "Select an item to drop"
+    def __init__(self, engine):
+        QUESTION = "Select an item to drop"
+        super().__init__(engine, question=QUESTION)
 
     def on_item_selected(self, item: Item) -> Optional[ActionOrHandler]:
         """Drop this item."""
@@ -461,7 +720,7 @@ class SelectIndexHandler(AskUserEventHandler):
 
     def __init__(self, engine: Engine):
         """Sets the cursor to the player when this handler is constructed."""
-        super().__init__(engine)
+        super().__init__(engine, frame_width=None, frame_height=None)
         player = self.engine.player
         engine.mouse_location = player.x, player.y
 
@@ -572,6 +831,10 @@ class MainGameEventHandler(EventHandler):
             tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
         ):
             return actions.TakeStairsAction(player)
+        if key == tcod.event.KeySym.S and modifier & (
+            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
+        ):
+            return QueryRestLoopHandler(self.engine)
 
         if key in MOVE_KEYS:
             dx, dy = MOVE_KEYS[key]
@@ -579,7 +842,7 @@ class MainGameEventHandler(EventHandler):
         elif key in WAIT_KEYS:
             action = WaitAction(player)
         elif key == tcod.event.KeySym.ESCAPE:
-            raise SystemExit()
+            return EscapeMenuEventHandler(self.engine)
         elif key == tcod.event.KeySym.V:
             return HistoryViewer(self.engine)
         elif key == tcod.event.KeySym.G:
@@ -604,14 +867,13 @@ class GameOverEventHandler(EventHandler):
             save_path.unlink()  # Deletes the active save file.
         raise exceptions.QuitWithoutSaving()  # Avoid saving a finished game.
 
-    def _handle_quit(self, event: tcod.event.Quit) -> None:
+    def _handle_quit(self) -> None:
         self.on_quit()
 
     def _handle_key(self, event: tcod.event.KeyDown) -> Optional[Action]:
         action: Optional[Action] = None
 
         key = event.sym
-        player = self.engine.player
 
         if key == tcod.event.KeySym.ESCAPE:
             self.on_quit()
