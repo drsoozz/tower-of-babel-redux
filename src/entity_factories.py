@@ -114,6 +114,8 @@ lightning_scroll = Item(
     consumable=consumable.LightningDamageConsumable(damage=20, maximum_range=5),
 )
 
+"""
+
 dagger = Item(
     char="/", color=(0, 191, 255), name="Dagger", equippable=equippable.Dagger()
 )
@@ -130,3 +132,5 @@ leather_armor = Item(
 chain_mail = Item(
     char="[", color=(139, 69, 19), name="Chain Mail", equippable=equippable.ChainMail()
 )
+
+"""

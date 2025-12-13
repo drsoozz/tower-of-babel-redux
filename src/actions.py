@@ -9,6 +9,7 @@ import consts
 from combat_types import CombatTypes
 import exceptions
 from components.stats.damage_types import DamageTypes
+from render_functions import round_for_display
 
 
 if TYPE_CHECKING:
@@ -185,7 +186,7 @@ class AttackAction(Action):
         self.engine.message_log.add_blank()
 
         # attack rating (higher means more likely to hit)
-        attack = self.attacker.fighter.stats.dexterity.value
+        attack = self.attacker.fighter.stats.attack
 
         # defense rating (higher means less likely to hit)
         defense = self.defender.fighter.stats.total_defense
@@ -199,7 +200,7 @@ class AttackAction(Action):
         if roll < chance:
             # how much raw damage will be given if it is successful
             damage = (
-                self.attacker.fighter.stats.strength.value
+                self.attacker.fighter.stats.damage
                 * self.attacker.fighter.stats.damage_amps.multiplier(
                     DamageTypes.BLUDGEONING
                 )
@@ -218,7 +219,7 @@ class AttackAction(Action):
             final_damage = damage * resist
             if final_damage > 0:
                 self.engine.message_log.add_message(
-                    f"The attack does {final_damage} damage."
+                    f"The attack does {round_for_display(final_damage)} damage."
                 )
                 self.defender.fighter.hp -= final_damage
             else:
@@ -227,7 +228,10 @@ class AttackAction(Action):
             # print(attack, defense, chance, roll, damage, resist, final_damage)
         else:
             self.engine.message_log.add_message("The attack missed!")
-        self.apply_cost(5e5 * self.attacker.fighter.stats.initiative.attack_multiplier)
+        self.apply_cost(
+            self.attacker.fighter.stats.init_cost
+            * self.attacker.fighter.stats.initiative.attack_multiplier
+        )
 
 
 class MeleeAction(ActionWithDirection):

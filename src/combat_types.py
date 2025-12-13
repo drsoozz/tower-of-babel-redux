@@ -1,6 +1,6 @@
-from enum import Enum
+from base_enum import BaseEnum
 
 
-class CombatTypes(str, Enum):
+class CombatTypes(str, BaseEnum):
     DAMAGE = "Attack"
     RESIST = "Resist"

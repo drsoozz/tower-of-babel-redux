@@ -1,7 +1,8 @@
-from enum import auto, Enum
+from enum import auto
+from base_enum import BaseEnum
 
 
-class StatModType(Enum):
+class StatModType(BaseEnum):
     FLAT = auto()
     PERCENT_ADD = auto()
     PERCENT_MULT = auto()

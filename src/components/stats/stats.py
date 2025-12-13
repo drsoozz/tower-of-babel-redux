@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, overload, Dict, Optional, Tuple
 
 import consts
 from components.stats.character_stat import CharacterStat
@@ -11,9 +11,11 @@ from components.stats.stat_types import StatTypes
 from components.stats.damage_types import DamageTypes
 from components.stats.initiative import Initiative
 from components.stats.damage_stats import ResistStats, DamageAmpStats, MasteryStats
+from components.equipment_types import EquipmentTypes
 
 if TYPE_CHECKING:
     from components.fighter import Fighter
+    from components.stats.character_stat import CappedStat
 
 
 class Stats:
@@ -115,15 +117,85 @@ class Stats:
         except (KeyError, TypeError):
             self.mana_regen = self._create_mana_regen()
 
-        self.naked_head_defense = self._create_naked_defense()
-        self.naked_chest_defense = self._create_naked_defense()
-        self.naked_legs_defense = self._create_naked_defense()
-        self.naked_feet_defense = self._create_naked_defense()
-
         self.initiative = Initiative(self)
         self.damage_resists = ResistStats(damage_types=damage_resists, parent=self)
         self.damage_amps = DamageAmpStats(damage_types=damage_amps, parent=self)
         self.damage_masteries = MasteryStats(damage_types=damage_masteries, parent=self)
+
+        self.naked_head_defense = self._create_naked_defense()
+        self.naked_torso_defense = self._create_naked_defense()
+        self.naked_legs_defense = self._create_naked_defense()
+        self.naked_feet_defense = self._create_naked_defense()
+
+        self.unarmed_attack = self._create_naked_attack()
+        self.unarmed_damage = self._create_naked_damage()
+        self.unarmed_init_cost = consts.MAX_INIT // 4
+        self.unarmed_attack_range = None  # melee
+
+    @property
+    def attack(self) -> float:
+        return self.unarmed_attack.value
+
+    @property
+    def damage(self) -> float:
+        return self.unarmed_damage.value
+
+    @property
+    def init_cost(self) -> int:
+        return self.unarmed_init_cost
+
+    @property
+    def attack_range(self) -> int | None:
+        return self.attack_range
+
+    @property
+    def head_defense(self) -> float:
+        item = self.parent.parent.equipment.slots.get(EquipmentTypes.HEAD)
+        if item is None:
+            return self.naked_head_defense.value
+        item_defense = item.equippable.get_defense(self.parent.parent)
+        if item_defense is None:
+            return self.naked_head_defense.value
+        return item_defense.value
+
+    @property
+    def torso_defense(self) -> float:
+        item = self.parent.parent.equipment.slots.get(EquipmentTypes.TORSO)
+        if item is None:
+            return self.naked_torso_defense.value
+        item_defense = item.equippable.get_defense(self.parent.parent)
+        if item_defense is None:
+            return self.naked_torso_defense.value
+        return item_defense.value
+
+    @property
+    def legs_defense(self) -> float:
+        item = self.parent.parent.equipment.slots.get(EquipmentTypes.LEGS)
+        if item is None:
+            return self.naked_legs_defense.value
+        item_defense = item.equippable.get_defense(self.parent.parent)
+        if item_defense is None:
+            return self.naked_legs_defense.value
+        return item_defense.value
+
+    @property
+    def feet_defense(self) -> float:
+        item = self.parent.parent.equipment.slots.get(EquipmentTypes.FEET)
+        if item is None:
+            return self.naked_feet_defense.value
+        item_defense = item.equippable.get_defense(self.parent.parent)
+        if item_defense is None:
+            return self.naked_feet_defense.value
+        return item_defense.value
+
+    @property
+    def total_defense(self) -> float:
+        return (
+            self.head_defense
+            + self.torso_defense
+            + self.legs_defense
+            + self.feet_defense
+        )
 
     def regenerate(self, diff: int) -> None:
         self.initiative.initiative.modify(diff, sudo=True)
@@ -134,6 +206,27 @@ class Stats:
         self.hp.regenerate(time_factor=time_factor, regen=self.hp_regen.value)
         self.energy.regenerate(time_factor=time_factor, regen=self.energy_regen.value)
         self.mana.regenerate(time_factor=time_factor, regen=self.mana_regen.value)
+
+    @overload
+    def get_stat(self, stat: StatTypes) -> CharacterStat: ...
+
+    @overload
+    def get_stat(self, stat: Tuple[StatTypes, DamageTypes]) -> CappedStat: ...
+
+    def get_stat(
+        self, stat: StatTypes | Tuple[StatTypes, DamageTypes]
+    ) -> CharacterStat | CappedStat:
+        if isinstance(stat, StatTypes):
+            stat_obj = getattr(self, stat.normalized)
+            if isinstance(stat_obj, Resource):
+                return stat_obj.max
+            return stat_obj
+
+        damage_stat_type, damage_type = stat
+        return getattr(
+            getattr(self, damage_stat_type.normalized),
+            damage_type.normalized,
+        )
 
     # ################# #
     # STAT CONSTRUCTORS #
@@ -332,7 +425,7 @@ class Stats:
         return mana_regen
 
     def _create_naked_defense(self) -> CharacterStat:
-        naked_defense = CharacterStat(base_value=0, name=StatTypes.DEFENSE)
+        naked_defense = CharacterStat(base_value=0, name="NAKED_DEFENSE")
         _nd_dex = CharacterStat(base_value=self.dexterity, name="BASE")
         _nd_dex.add_modifier(
             StatModifier(value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE")
@@ -343,27 +436,48 @@ class Stats:
         )
         return naked_defense
 
-    @property
-    def head_defense(self) -> float:
-        return self.naked_head_defense.value
+    def _create_naked_attack(self) -> CharacterStat:
+        # 25% str, 75% dex
+        naked_attack = CharacterStat(base_value=0, name="NAKED_ATTACK")
 
-    @property
-    def chest_defense(self) -> float:
-        return self.naked_chest_defense.value
-
-    @property
-    def legs_defense(self) -> float:
-        return self.naked_legs_defense.value
-
-    @property
-    def feet_defense(self) -> float:
-        return self.naked_feet_defense.value
-
-    @property
-    def total_defense(self) -> float:
-        return (
-            self.head_defense
-            + self.chest_defense
-            + self.legs_defense
-            + self.feet_defense
+        _str = CharacterStat(base_value=self.strength, name="BASE")
+        _str.add_modifier(
+            StatModifier(value=0.25, mod_type=StatModType.PERCENT_MULT, source="Base")
         )
+
+        _dex = CharacterStat(base_value=self.dexterity, name="BASE")
+        _dex.add_modifier(
+            StatModifier(value=0.75, mod_type=StatModType.PERCENT_MULT, source="Base")
+        )
+
+        naked_attack.add_modifier(
+            StatModifier(value=_str, mod_type=StatModType.FLAT, source="BASE")
+        )
+        naked_attack.add_modifier(
+            StatModifier(value=_dex, mod_type=StatModType.FLAT, source="BASE")
+        )
+
+        return naked_attack
+
+    def _create_naked_damage(self) -> CharacterStat:
+        # is a 25 init weapon, so total of 25% damage
+        # 20% str, 5% dex
+        naked_damage = CharacterStat(base_value=0, name="NAKED_DAMAGE")
+        _str = CharacterStat(base_value=self.strength, name="BASE")
+        _str.add_modifier(
+            StatModifier(value=0.2, mod_type=StatModType.PERCENT_MULT, source="Base")
+        )
+
+        _dex = CharacterStat(base_value=self.dexterity, name="BASE")
+        _dex.add_modifier(
+            StatModifier(value=0.05, mod_type=StatModType.PERCENT_MULT, source="Base")
+        )
+
+        naked_damage.add_modifier(
+            StatModifier(value=_str, mod_type=StatModType.FLAT, source="BASE")
+        )
+        naked_damage.add_modifier(
+            StatModifier(value=_dex, mod_type=StatModType.FLAT, source="BASE")
+        )
+
+        return naked_damage

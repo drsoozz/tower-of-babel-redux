@@ -1,7 +1,7 @@
-from enum import Enum
+from base_enum import BaseEnum
 
 
-class StatTypes(str, Enum):
+class StatTypes(str, BaseEnum):
     # extend as needed
     STRENGTH = "Strength"
     DEXTERITY = "Dexterity"
@@ -17,4 +17,6 @@ class StatTypes(str, Enum):
     MANA_REGEN = "Mana Regen"
     CARRYING_CAPACITY = "Carrying Capacity"
     ENCUMBRANCE = "Encumbrance"
-    DEFENSE = "Defense"
+    DAMAGE_RESISTS = "Damage Resists"
+    DAMAGE_AMPS = "Damage Amps"
+    DAMAGE_MASTERIES = "Damage Masteries"

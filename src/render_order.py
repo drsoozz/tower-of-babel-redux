@@ -1,7 +1,8 @@
-from enum import auto, Enum
+from enum import auto
+from base_enum import BaseEnum
 
 
-class RenderOrder(Enum):
+class RenderOrder(BaseEnum):
     CORPSE = auto()
     ITEM = auto()
     ACTOR = auto()

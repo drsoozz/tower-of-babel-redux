@@ -7,10 +7,10 @@ across various combat and stat-related systems, including amplification, resista
 immunity, and more.
 """
 
-from enum import Enum
+from base_enum import BaseEnum
 
 
-class DamageTypes(str, Enum):
+class DamageTypes(str, BaseEnum):
     """Enumeration of all damage types used in the game's combat system.
 
     This enum is used to provide a unified reference point for defining and checking
