@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 import math
 
 import color
@@ -22,7 +22,6 @@ def get_names_at_location(x: int, y: int, game_map: GameMap) -> str:
     names = ", ".join(
         entity.name for entity in game_map.entities if entity.x == x and entity.y == y
     )
-    print(names.capitalize())
     return names.capitalize()
 
 

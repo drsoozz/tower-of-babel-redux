@@ -3,6 +3,8 @@ from pathlib import Path
 from components.stats.stat_types import StatTypes
 from components.stats.stat_modifier import StatModifier
 from components.stats.stat_mod_types import StatModType
+from components.stats.damage_types import DamageTypes
+from components.stats.weapon_range import WeaponRange
 from components.equipment_types import EquipmentTypes
 
 BASE_PATH = Path("src")
@@ -42,3 +44,27 @@ DEFAULT_DEFENSE_DICT = {
         )
     },
 }
+
+# unarmed strike
+DEFAULT_UNARMED_ATTACK_DICT = {
+    StatTypes.STRENGTH: StatModifier(
+        value=0.20, mod_type=StatModType.PERCENT_MULT, source="BASE"
+    ),
+    StatTypes.DEXTERITY: StatModifier(
+        value=0.80, mod_type=StatModType.PERCENT_MULT, source="BASE"
+    ),
+}
+
+DEFAULT_UNARMED_DAMAGE_DICT = {
+    DamageTypes.BLUDGEONING: {
+        StatTypes.STRENGTH: StatModifier(
+            value=0.45, mod_type=StatModType.PERCENT_MULT, source="BASE"
+        ),
+        StatTypes.DEXTERITY: StatModifier(
+            value=0.10, mod_type=StatModType.PERCENT_MULT, source="BASE"
+        ),
+    }
+}
+DEFAULT_UNARMED_WEAPON_RANGE = WeaponRange(max_range=None)
+
+DEFAULT_UNARMED_ATTACK_INIT_COST = MAX_INIT / 2

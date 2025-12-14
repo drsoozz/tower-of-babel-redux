@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, overload, Dict, Optional, Tuple, List
+from copy import deepcopy
 
 import consts
 from components.stats.character_stat import CharacterStat
@@ -13,11 +14,55 @@ from components.stats.damage import Damage
 from components.stats.initiative import Initiative
 from components.stats.damage_stats import ResistStats, DamageAmpStats, MasteryStats
 from components.equipment_types import EquipmentTypes
-from components.equippable import ArmorEquippable
+from components.equippable import ArmorEquippable, WeaponEquippable
 
 if TYPE_CHECKING:
     from components.fighter import Fighter
     from components.stats.character_stat import CappedStat
+    from components.stats.weapon_range import WeaponRange
+
+_STAT_BUILD_TABLE = {
+    StatTypes.HP: (
+        StatTypes.HP.normalized,
+        Resource,
+        "_create_hp",
+    ),
+    StatTypes.ENERGY: (
+        StatTypes.ENERGY.normalized,
+        Resource,
+        "_create_energy",
+    ),
+    StatTypes.MANA: (
+        StatTypes.MANA.normalized,
+        Resource,
+        "_create_mana",
+    ),
+    StatTypes.CARRYING_CAPACITY: (
+        StatTypes.CARRYING_CAPACITY.normalized,
+        Resource,
+        "_create_carrying_capacity",
+    ),
+    StatTypes.ENCUMBRANCE: (
+        StatTypes.ENCUMBRANCE.normalized,
+        Resource,
+        "_create_encumbrance",
+    ),
+    StatTypes.HP_REGEN: (
+        StatTypes.HP_REGEN.normalized,
+        CharacterStat,
+        "_create_health_regen",
+    ),
+    StatTypes.ENERGY_REGEN: (
+        StatTypes.ENERGY_REGEN.normalized,
+        CharacterStat,
+        "_create_energy_regen",
+    ),
+    StatTypes.MANA_REGEN: (
+        StatTypes.MANA_REGEN.normalized,
+        CharacterStat,
+        "_create_mana_regen",
+    ),
+}
 
 
 class Stats:
@@ -25,17 +70,37 @@ class Stats:
     def __init__(
         self,
         *,
+        parent: Fighter,
         base_stats: Dict[StatTypes, int | float],
         damage_resists: Optional[Dict[DamageTypes, float]],
         damage_amps: Optional[Dict[DamageTypes, float]],
-        damage_masteries: Dict[DamageTypes, float],
-        parent: Fighter,
-        natural_defense_dict: Dict[
-            EquipmentTypes, Dict[StatTypes, StatModifier | List[StatModifier]]
-        ] = consts.DEFAULT_DEFENSE_DICT,
-        natural_weapon_dict: Dict[StatTypes, StatModifier | List[StatModifier]] = None,
+        damage_masteries: Optional[Dict[DamageTypes, float]],
+        natural_defense_dict: Optional[
+            Dict[EquipmentTypes, Dict[StatTypes, StatModifier | List[StatModifier]]]
+        ] = None,
+        natural_weapon_attack_dict: Optional[
+            Dict[StatTypes, StatModifier | List[StatModifier]]
+        ] = None,
+        natural_weapon_damage_dict: Optional[
+            Dict[DamageTypes, Dict[StatTypes, StatModifier | List[StatModifier]]]
+        ] = None,
+        natural_weapon_range: Optional[WeaponRange] = None,
+        natural_weapon_attack_init_cost: Optional[
+            int
+        ] = consts.DEFAULT_UNARMED_ATTACK_INIT_COST,
     ):
         self.parent = parent
+
+        # fixing dicts (these ahve to be done like this cause otherwise you get Pylint W0102 (dangerous default argument))
+        if natural_defense_dict is None:
+            natural_defense_dict = deepcopy(consts.DEFAULT_DEFENSE_DICT)
+        if natural_weapon_attack_dict is None:
+            natural_weapon_attack_dict = deepcopy(consts.DEFAULT_UNARMED_ATTACK_DICT)
+        if natural_weapon_damage_dict is None:
+            natural_weapon_damage_dict = deepcopy(consts.DEFAULT_UNARMED_DAMAGE_DICT)
+        if natural_weapon_range is None:
+            natural_weapon_range = deepcopy(consts.DEFAULT_UNARMED_WEAPON_RANGE)
+
         self.strength = CharacterStat(
             base_value=base_stats[StatTypes.STRENGTH], name=StatTypes.STRENGTH.value
         )
@@ -64,65 +129,25 @@ class Stats:
 
         # if base_stats gives an hp, use it. if not, create hp the normal way
         # providing an hp value in base_stats is a way to overrride the typical hp calculation
-        try:
-            self.hp = Resource(
-                base_value=base_stats[StatTypes.HP],
-                name=StatTypes.HP.value,
-            )
-        except (KeyError, TypeError):
-            self.hp = self._create_hp()
-        try:
-            self.energy = Resource(
-                base_value=base_stats[StatTypes.ENERGY], name=StatTypes.ENERGY.value
-            )
-        except (KeyError, TypeError):
-            self.energy = self._create_energy()
+        # same with the rest!
 
-        try:
-            self.mana = Resource(
-                base_value=base_stats[StatTypes.MANA], name=StatTypes.MANA.value
+        self.hp: Resource
+        self.energy: Resource
+        self.mana: Resource
+        self.carrying_capacity: Resource
+        self.encumbrance: Resource
+        self.hp_regen: CharacterStat
+        self.energy_regen: CharacterStat
+        self.mana_regen: CharacterStat
+        # actually making the stats
+        for stat_type, (attr, ctor, factory_name) in _STAT_BUILD_TABLE.items():
+            self._build_optional_stat(
+                base_stats=base_stats,
+                stat_type=stat_type,
+                attr_name=attr,
+                ctor=ctor,
+                default_factory_name=factory_name,
             )
-        except (KeyError, TypeError):
-            self.mana = self._create_mana()
-
-        try:
-            self.carrying_capacity = Resource(
-                base_value=base_stats[StatTypes.CARRYING_CAPACITY],
-                name=StatTypes.CARRYING_CAPACITY.value,
-            )
-        except (KeyError, TypeError):
-            self.carrying_capacity = self._create_carrying_capacity()
-
-        try:
-            self.encumbrance = Resource(
-                base_value=base_stats[StatTypes.ENCUMBRANCE],
-                name=StatTypes.ENCUMBRANCE.value,
-            )
-        except (KeyError, TypeError):
-            self.encumbrance = self._create_encumbrance()
-
-        try:
-            self.hp_regen = CharacterStat(
-                base_value=base_stats[StatTypes.HP_REGEN], name=StatTypes.HP_REGEN.value
-            )
-        except (KeyError, TypeError):
-            self.hp_regen = self._create_health_regen()
-
-        try:
-            self.energy_regen = CharacterStat(
-                base_value=base_stats[StatTypes.ENERGY_REGEN],
-                name=StatTypes.ENERGY_REGEN.value,
-            )
-        except (KeyError, TypeError):
-            self.energy_regen = self._create_energy_regen()
-
-        try:
-            self.mana_regen = CharacterStat(
-                base_value=base_stats[StatTypes.MANA_REGEN],
-                name=StatTypes.MANA_REGEN.value,
-            )
-        except (KeyError, TypeError):
-            self.mana_regen = self._create_mana_regen()
 
         self.initiative = Initiative(self)
         self.damage_resists = ResistStats(damage_types=damage_resists, parent=self)
@@ -146,74 +171,80 @@ class Stats:
             defense_mods=natural_defense_dict[EquipmentTypes.FEET],
         )
 
-        self.unarmed_attack = self._create_naked_attack()
-        self.unarmed_damage = self._create_naked_damage()
-        self.unarmed_init_cost = consts.MAX_INIT // 4
-        self.unarmed_attack_range = None  # melee
+        self.unarmed_weapon = WeaponEquippable(
+            equipment_type=(EquipmentTypes.MAIN_HAND, EquipmentTypes.OFF_HAND),
+            attack_mods=natural_weapon_attack_dict,
+            damage_mods=natural_weapon_damage_dict,
+            weapon_range=natural_weapon_range,
+            attack_init_cost=natural_weapon_attack_init_cost,
+        )
 
     @property
     def attack(self) -> float:
-        return self.unarmed_attack.value
+        return self.unarmed_weapon.get_attack(self.parent.parent).value
 
     @property
     def damage(self) -> Damage:
-        return Damage({DamageTypes.BLUDGEONING: self.unarmed_damage.value})
+        return Damage(self.unarmed_weapon.get_damage(self.parent.parent))
 
     @property
     def attack_init_cost(self) -> int:
-        return self.unarmed_init_cost * self.initiative.attack_multiplier
+        return (
+            self.unarmed_weapon.get_attack_init_cost(self.parent.parent)
+            * self.initiative.attack_multiplier
+        )
 
     @property
-    def attack_range(self) -> int | None:
-        return self.attack_range
+    def attack_range(self) -> WeaponRange:
+        return self.unarmed_weapon.weapon_range
 
     @property
-    def head_defense(self) -> float:
+    def head_defense(self) -> CharacterStat:
         item = self.parent.parent.equipment.slots.get(EquipmentTypes.HEAD)
         if item is None:
-            return self.naked_head_defense.get_defense(self.parent.parent).value
+            return self.naked_head_defense.get_defense(self.parent.parent)
         item_defense = item.equippable.get_defense(self.parent.parent)
         if item_defense is None:
-            return self.naked_head_defense.get_defense(self.parent.parent).value
-        return item_defense.value
+            return self.naked_head_defense.get_defense(self.parent.parent)
+        return item_defense
 
     @property
-    def torso_defense(self) -> float:
+    def torso_defense(self) -> CharacterStat:
         item = self.parent.parent.equipment.slots.get(EquipmentTypes.TORSO)
         if item is None:
-            return self.naked_torso_defense.get_defense(self.parent.parent).value
+            return self.naked_torso_defense.get_defense(self.parent.parent)
         item_defense = item.equippable.get_defense(self.parent.parent)
         if item_defense is None:
-            return self.naked_torso_defense.get_defense(self.parent.parent).value
-        return item_defense.value
+            return self.naked_torso_defense.get_defense(self.parent.parent)
+        return item_defense
 
     @property
-    def legs_defense(self) -> float:
+    def legs_defense(self) -> CharacterStat:
         item = self.parent.parent.equipment.slots.get(EquipmentTypes.LEGS)
         if item is None:
-            return self.naked_legs_defense.get_defense(self.parent.parent).value
+            return self.naked_legs_defense.get_defense(self.parent.parent)
         item_defense = item.equippable.get_defense(self.parent.parent)
         if item_defense is None:
-            return self.naked_legs_defense.get_defense(self.parent.parent).value
-        return item_defense.value
+            return self.naked_legs_defense.get_defense(self.parent.parent)
+        return item_defense
 
     @property
-    def feet_defense(self) -> float:
+    def feet_defense(self) -> CharacterStat:
         item = self.parent.parent.equipment.slots.get(EquipmentTypes.FEET)
         if item is None:
-            return self.naked_feet_defense.get_defense(self.parent.parent).value
+            return self.naked_feet_defense.get_defense(self.parent.parent)
         item_defense = item.equippable.get_defense(self.parent.parent)
         if item_defense is None:
-            return self.naked_feet_defense.get_defense(self.parent.parent).value
-        return item_defense.value
+            return self.naked_feet_defense.get_defense(self.parent.parent)
+        return item_defense
 
     @property
     def total_defense(self) -> float:
         return (
-            self.head_defense
-            + self.torso_defense
-            + self.legs_defense
-            + self.feet_defense
+            self.head_defense.value
+            + self.torso_defense.value
+            + self.legs_defense.value
+            + self.feet_defense.value
         )
 
     def regenerate(self, diff: int) -> None:
@@ -250,6 +281,26 @@ class Stats:
     # ################# #
     # STAT CONSTRUCTORS #
     # ################# #
+
+    def _build_optional_stat(
+        self,
+        *,
+        base_stats: dict,
+        stat_type: StatTypes,
+        attr_name: str,
+        ctor: type,
+        default_factory_name: str,
+    ) -> None:
+        override = None
+        if base_stats is not None:
+            override = base_stats.get(stat_type)
+
+        if override is not None:
+            stat = ctor(base_value=override, name=stat_type.value)
+        else:
+            stat = getattr(self, default_factory_name)()
+
+        setattr(self, attr_name, stat)
 
     def _create_hp(self) -> Resource:
         # base hp is 500% con (plus some from levels). base is 10 (at lvl 1)

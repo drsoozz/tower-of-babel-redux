@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Tuple, Dict, List, Optional
 
+
+import consts
+
 from components.base_component import BaseComponent
 from components.equipment_types import EquipmentTypes
-
 from components.stats.stat_modifier import StatModifier
-from components.stats.stat_mod_types import StatModType
 from components.stats.character_stat import CharacterStat
+from components.stats.build_composite_stat import build_composite_stat
+from components.stats.weapon_range import WeaponRange
 
 if TYPE_CHECKING:
     from entity import Item, Actor
@@ -17,6 +20,11 @@ if TYPE_CHECKING:
 
 class Equippable(BaseComponent):
     parent: Item
+
+    # overwritten by subclasses, not really used here
+    VALID_EQUIPMENT_TYPES = list(EquipmentTypes) + [
+        (EquipmentTypes.MAIN_HAND, EquipmentTypes.OFF_HAND)
+    ]
 
     def __init__(
         self,
@@ -59,6 +67,69 @@ class Equippable(BaseComponent):
             stat.remove_all_from_source(self.parent)
 
 
+class WeaponEquippable(Equippable):
+    VALID_EQUIPMENT_TYPES = [
+        EquipmentTypes.MAIN_HAND,
+        EquipmentTypes.OFF_HAND,
+        (EquipmentTypes.MAIN_HAND, EquipmentTypes.OFF_HAND),
+    ]
+
+    def __init__(
+        self,
+        equipment_type: EquipmentTypes,
+        bonuses: Optional[
+            Dict[
+                StatTypes | Tuple[StatTypes, DamageTypes],
+                StatModifier | List[StatModifier],
+            ]
+        ] = None,
+        attack_mods: Optional[
+            Dict[StatTypes, StatModifier | List[StatModifier]]
+        ] = None,
+        damage_mods: Optional[
+            Dict[DamageTypes, Dict[StatTypes, StatModifier | List[StatModifier]]]
+        ] = None,
+        weapon_range: Optional[WeaponRange] = None,
+        attack_init_cost: float = consts.MAX_INIT / 2,  # 50 init,
+    ):
+        if equipment_type not in self.VALID_EQUIPMENT_TYPES:
+            raise ValueError(
+                f"Invalid armor slot: {equipment_type.value}. Must be one of {[slot.value for slot in self.VALID_EQUIPMENT_TYPES]}"
+            )
+        super().__init__(equipment_type, bonuses)
+        self.attack_mods = attack_mods or {}
+        self.damage_mods = damage_mods or {}
+        self.attack_init_cost = attack_init_cost or {}
+        self.weapon_range = weapon_range or WeaponRange(max_range=None)
+
+    def get_attack(self, actor: Actor) -> Optional[CharacterStat]:
+        if not self.attack_mods:
+            return None
+
+        return build_composite_stat(
+            actor=actor,
+            base_value=0,
+            name="ATTACK",
+            stat_mods=self.attack_mods,
+            source=self,
+        )
+
+    def get_damage(self, actor: Actor) -> Dict[DamageTypes, float]:
+        if not self.damage_mods:
+            return None
+
+        final_damage_dict = {}
+        for damtype, damdict in self.damage_mods.items():
+            final_damage_dict[damtype] = build_composite_stat(
+                actor=actor, base_value=0, name="DAMAGE", stat_mods=damdict, source=self
+            ).value
+
+        return final_damage_dict
+
+    def get_attack_init_cost(self, actor: Actor) -> Optional[CharacterStat]:
+        return self.attack_init_cost
+
+
 class ArmorEquippable(Equippable):
     VALID_EQUIPMENT_TYPES = [
         EquipmentTypes.HEAD,
@@ -89,25 +160,16 @@ class ArmorEquippable(Equippable):
         """
         Build the CharacterStat for this armor's defense from the modifiers dict.
         """
-        if self.defense_mods is None:
+        if not self.defense_mods:
             return None
 
-        defense = CharacterStat(base_value=0, name="DEFENSE")
-
-        stats = actor.fighter.stats
-        for stat_type, modifiers in self.defense_mods.items():
-            if not isinstance(modifiers, list):
-                modifiers = [modifiers]
-            stat = stats.get_stat(stat_type)
-            cstat = CharacterStat(base_value=stat, name="DEFENSE")
-
-            for mod in modifiers:
-                cstat.add_modifier(mod)
-
-            defense.add_modifier(
-                StatModifier(value=cstat, mod_type=StatModType.FLAT, source="DEFENSE")
-            )
-        return defense
+        return build_composite_stat(
+            actor=actor,
+            base_value=0,
+            name="DEFENSE",
+            stat_mods=self.defense_mods,
+            source=self,
+        )
 
 
 """

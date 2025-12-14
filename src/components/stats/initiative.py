@@ -26,7 +26,6 @@ class Initiative:
         self.casting_speed = CharacterStat(base_value=1, name="BASE")
         self.movement_speed = CharacterStat(base_value=1, name="BASE")
 
-        print(type(self._dex_speed_scaling))
         _dex_speed = CharacterStat(base_value=self.parent.dexterity, name="BASE")
 
         _dex_scaling = StatModifier(

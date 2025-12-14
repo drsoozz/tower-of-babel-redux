@@ -210,8 +210,6 @@ class AttackAction(Action):
                 final_damage
             )
 
-            print(self.attacker.name, self.attacker.fighter.stats.attack_init_cost)
-
             if summed_damage > 0:
                 for damtype, damval in final_damage.items():
                     damtype: DamageTypes

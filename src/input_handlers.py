@@ -417,6 +417,8 @@ class LoopHandler(EventHandler):
         self.until_full = until_full
 
         self.quick = True
+        # possibly change this to checking if there are any actors within a 10 tile radius?
+        # could help with bugs with AI and the quick features lol
         for actor in self.engine.game_map.actors:
             if (
                 self.engine.game_map.visible[actor.x, actor.y]
@@ -424,7 +426,6 @@ class LoopHandler(EventHandler):
                 and actor != self.engine.player
             ):
                 self.quick = False
-        print(self.quick)
 
     def tick(self, console: tcod.console.Console):
         if self.until_full:
