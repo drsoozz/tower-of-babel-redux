@@ -40,6 +40,53 @@ class Equipment(BaseComponent):
             slot: None for slot in EquipmentTypes
         }
 
+    @property
+    def is_two_handing(self) -> bool:
+        """
+        Return True if the actor is currently two-handing a weapon.
+
+        Two-handing is defined as the same item occupying both MAIN_HAND
+        and OFF_HAND, and that item explicitly declaring both slots.
+        """
+        main = self.slots.get(EquipmentTypes.MAIN_HAND)
+        off = self.slots.get(EquipmentTypes.OFF_HAND)
+
+        if main is None or off is None:
+            return False
+
+        if main is not off:
+            return False
+
+        # Sanity check: item actually declares both slots
+        occupied = self.occupied_slots(main)
+        return (
+            EquipmentTypes.MAIN_HAND in occupied and EquipmentTypes.OFF_HAND in occupied
+        )
+
+    @property
+    def is_dual_wielding(self) -> bool:
+        """
+        Return True if the actor is dual-wielding.
+
+        Dual-wielding is defined as MAIN_HAND and OFF_HAND both being occupied
+        by different items, and neither item being two-handed.
+        """
+        main = self.slots.get(EquipmentTypes.MAIN_HAND)
+        off = self.slots.get(EquipmentTypes.OFF_HAND)
+
+        if main is None or off is None:
+            return False
+
+        if main is off:
+            return False  # same item => two-handing, not dual-wielding
+
+        main_slots = self.occupied_slots(main)
+        off_slots = self.occupied_slots(off)
+
+        return main_slots == (EquipmentTypes.MAIN_HAND,) and off_slots == (
+            EquipmentTypes.OFF_HAND,
+        )
+
     def item_is_equipped(self, item: Item) -> bool:
         """
         Check if a specific item is currently equipped in any slot.

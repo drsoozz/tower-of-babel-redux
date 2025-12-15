@@ -183,49 +183,51 @@ class AttackAction(Action):
         self.defender = defender
 
     def perform(self) -> None:
+
         self.engine.message_log.add_blank()
 
-        # attack rating (higher means more likely to hit)
-        attack = self.attacker.fighter.stats.attack
+        # attacker info
+        attacks = self.attacker.fighter.stats.attack
+        damages = self.attacker.fighter.stats.damage
+        attack_init_costs = self.attacker.fighter.stats.attack_init_cost
 
-        # defense rating (higher means less likely to hit)
+        # defender info
         defense = self.defender.fighter.stats.total_defense
 
-        chance = 0.5 + (attack - defense) * 0.025
+        for attack, damage, attack_init_cost in zip(
+            attacks, damages, attack_init_costs
+        ):
+            chance = 0.5 + (attack - defense) * 0.025
+            roll = random.random()
 
-        attack_desc = f"{self.attacker.name.capitalize()} attacks {self.defender.name.capitalize()}."
-        self.engine.message_log.add_message(attack_desc)
+            attack_desc = f"{self.attacker.name.capitalize()} attacks {self.defender.name.capitalize()}."
+            self.engine.message_log.add_message(attack_desc)
 
-        roll = random.random()
-        if roll < max(0.05, chance):
-            # how much raw damage will be given if it is successful
-            damage = self.attacker.fighter.stats.damage.apply_boosts(self.attacker)
+            if roll < max(0.05, chance):
+                # final damage of attack
+                final_damage = damage.calculate_final_damage(
+                    attacker=self.attacker, defender=self.defender
+                )
 
-            # amount of damage actually received (between 0 and 1)
-            final_damage = self.attacker.fighter.stats.damage.apply_resistances(
-                scaled_damage=damage, defender=self.defender
-            )
+                summed_damage = final_damage.totalled_damage
 
-            summed_damage = self.attacker.fighter.stats.damage.sum_damage_dict(
-                final_damage
-            )
+                if summed_damage > 0:
+                    for damtype, damval in final_damage.values.items():
+                        damtype: DamageTypes
+                        if damval > 0:
+                            self.engine.message_log.add_message(
+                                f"The attack does {round_for_display(damval)} {damtype.value.upper()} damage."
+                            )
+                            self.defender.fighter.hp -= damval
+                else:
+                    self.engine.message_log.add_message("The attack does no damage.")
 
-            if summed_damage > 0:
-                for damtype, damval in final_damage.items():
-                    damtype: DamageTypes
-                    self.engine.message_log.add_message(
-                        f"The attack does {round_for_display(damval)} {damtype.value.upper()} damage."
-                    )
-                    self.defender.fighter.hp -= damval
+                # print(attack, defense, chance, roll, damage, resist, final_damage)
             else:
-                self.engine.message_log.add_message("The attack does no damage.")
-
-            # print(attack, defense, chance, roll, damage, resist, final_damage)
-        else:
-            self.engine.message_log.add_message("The attack missed!")
-        self.apply_cost(
-            self.attacker.fighter.stats.attack_init_cost
-        )  # already accounts for speed multipliers
+                self.engine.message_log.add_message("The attack missed!")
+            self.apply_cost(
+                attack_init_cost
+            )  # already accounts for everything (e.g. speed multipliers)
 
 
 class MeleeAction(ActionWithDirection):

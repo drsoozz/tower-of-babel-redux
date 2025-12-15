@@ -12,7 +12,11 @@ if TYPE_CHECKING:
     from components.ai import BaseAI
     from components.consumable import Consumable
     from components.equipment import Equipment
-    from components.equippable import Equippable, ArmorEquippable
+    from components.items.equippable import (
+        Equippable,
+        ArmorEquippable,
+        WeaponEquippable,
+    )
     from components.fighter import Fighter
     from components.inventory import Inventory
     from components.level import Level
@@ -146,7 +150,7 @@ class Item(Entity):
         color: Tuple[int, int, int] = (255, 255, 255),
         name: str = "<Unnamed>",
         consumable: Optional[Consumable] = None,
-        equippable: Optional[Equippable | ArmorEquippable] = None,
+        equippable: Optional[Equippable | ArmorEquippable | WeaponEquippable] = None,
     ):
         super().__init__(
             x=x,

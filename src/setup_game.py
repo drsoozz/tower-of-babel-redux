@@ -46,6 +46,11 @@ def new_game() -> Engine:
         "Hello and welcome, adventurer, to yet another dungeon!", color.welcome_text.rgb
     )
 
+    greathammer = copy.deepcopy(entity_factories.great_hammer)
+    greathammer.parent = player.inventory
+    player.inventory.items.append(greathammer)
+    player.equipment.toggle_equip(greathammer, add_message=False)
+
     return engine
 
 

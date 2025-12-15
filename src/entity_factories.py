@@ -1,8 +1,9 @@
 from components.ai import HostileEnemy
-from components import consumable, equippable
+from components import consumable
 from components.equipment import Equipment
 from components.fighter import Fighter
 from components.inventory import Inventory
+from components.items import equippable
 from components.level import Level
 from entity import Actor, Item
 
@@ -112,6 +113,13 @@ lightning_scroll = Item(
     color=(255, 255, 0),
     name="Lightning Scroll",
     consumable=consumable.LightningDamageConsumable(damage=20, maximum_range=5),
+)
+
+great_hammer = Item(
+    char="!",
+    color=(255, 255, 255),
+    name="Greathammer",
+    equippable=equippable.GreatHammer(),
 )
 
 """

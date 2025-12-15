@@ -14,7 +14,7 @@ from components.stats.damage import Damage
 from components.stats.initiative import Initiative
 from components.stats.damage_stats import ResistStats, DamageAmpStats, MasteryStats
 from components.equipment_types import EquipmentTypes
-from components.equippable import ArmorEquippable, WeaponEquippable
+from components.items.equippable import ArmorEquippable, WeaponEquippable
 
 if TYPE_CHECKING:
     from components.fighter import Fighter
@@ -179,64 +179,89 @@ class Stats:
             attack_init_cost=natural_weapon_attack_init_cost,
         )
 
-    @property
-    def attack(self) -> float:
-        return self.unarmed_weapon.get_attack(self.parent.parent).value
+        self.flat_attack = CharacterStat(base_value=0, name="BASE")
+        self.flat_damage: Dict[DamageTypes, CharacterStat] = {}
+        for damtype in DamageTypes:
+            self.flat_damage[damtype] = CharacterStat(base_value=0, name="BASE")
+        self.flat_defense = CharacterStat(base_value=0, name="BASE")
 
     @property
-    def damage(self) -> Damage:
-        return Damage(self.unarmed_weapon.get_damage(self.parent.parent))
+    def attack(self) -> List[float]:
+        weapon = self._resolve_weapon(self.unarmed_weapon)
+        attacks: List[float] = []
+
+        for wp in weapon:
+            attack = wp.get_attack(self.parent.parent).value + self.flat_attack.value
+            attacks.append(attack)
+        return attacks
 
     @property
-    def attack_init_cost(self) -> int:
-        return (
-            self.unarmed_weapon.get_attack_init_cost(self.parent.parent)
-            * self.initiative.attack_multiplier
-        )
+    def damage(self) -> List[Damage]:
+
+        weapon = self._resolve_weapon(self.unarmed_weapon)
+        damages: List[Damage] = []
+
+        for wp in weapon:
+            damage = wp.get_damage(self.parent.parent)
+            damage = damage.add(Damage(self.flat_damage))
+            damages.append(damage)
+        return damages
 
     @property
-    def attack_range(self) -> WeaponRange:
-        return self.unarmed_weapon.weapon_range
+    def attack_init_cost(self) -> List[int | float]:
+        weapon = self._resolve_weapon(self.unarmed_weapon)
+        attack_init_costs = []
+
+        for wp in weapon:
+            attack_init_cost = (
+                wp.get_attack_init_cost(actor=self.parent.parent)
+                * self.initiative.attack_multiplier
+            )
+            attack_init_costs.append(attack_init_cost)
+        return attack_init_costs
+
+    @property
+    def attack_range(self) -> List[WeaponRange]:
+        weapon = self._resolve_weapon(self.unarmed_weapon)
+        if not isinstance(weapon, tuple):
+            weapon = tuple(weapon)
+        weapon: tuple[WeaponEquippable]
+
+        lowest_attack_range = WeaponRange(9999)
+        for wp in weapon:
+            weapon_range = wp.weapon_range
+            if weapon_range.max_range < lowest_attack_range.max_range:
+                lowest_attack_range = weapon_range
+
+        attack_range: List[WeaponRange] = []
+        for _ in len(weapon):
+            attack_range.append(lowest_attack_range)
+
+        return attack_range
 
     @property
     def head_defense(self) -> CharacterStat:
-        item = self.parent.parent.equipment.slots.get(EquipmentTypes.HEAD)
-        if item is None:
-            return self.naked_head_defense.get_defense(self.parent.parent)
-        item_defense = item.equippable.get_defense(self.parent.parent)
-        if item_defense is None:
-            return self.naked_head_defense.get_defense(self.parent.parent)
-        return item_defense
+        return self._resolve_slot_defense(
+            slot=EquipmentTypes.HEAD, naked_defense=self.naked_head_defense
+        )
 
     @property
     def torso_defense(self) -> CharacterStat:
-        item = self.parent.parent.equipment.slots.get(EquipmentTypes.TORSO)
-        if item is None:
-            return self.naked_torso_defense.get_defense(self.parent.parent)
-        item_defense = item.equippable.get_defense(self.parent.parent)
-        if item_defense is None:
-            return self.naked_torso_defense.get_defense(self.parent.parent)
-        return item_defense
+        return self._resolve_slot_defense(
+            slot=EquipmentTypes.TORSO, naked_defense=self.naked_torso_defense
+        )
 
     @property
     def legs_defense(self) -> CharacterStat:
-        item = self.parent.parent.equipment.slots.get(EquipmentTypes.LEGS)
-        if item is None:
-            return self.naked_legs_defense.get_defense(self.parent.parent)
-        item_defense = item.equippable.get_defense(self.parent.parent)
-        if item_defense is None:
-            return self.naked_legs_defense.get_defense(self.parent.parent)
-        return item_defense
+        return self._resolve_slot_defense(
+            slot=EquipmentTypes.LEGS, naked_defense=self.naked_legs_defense
+        )
 
     @property
     def feet_defense(self) -> CharacterStat:
-        item = self.parent.parent.equipment.slots.get(EquipmentTypes.FEET)
-        if item is None:
-            return self.naked_feet_defense.get_defense(self.parent.parent)
-        item_defense = item.equippable.get_defense(self.parent.parent)
-        if item_defense is None:
-            return self.naked_feet_defense.get_defense(self.parent.parent)
-        return item_defense
+        return self._resolve_slot_defense(
+            slot=EquipmentTypes.FEET, naked_defense=self.naked_feet_defense
+        )
 
     @property
     def total_defense(self) -> float:
@@ -246,6 +271,46 @@ class Stats:
             + self.legs_defense.value
             + self.feet_defense.value
         )
+
+    def _resolve_weapon(
+        self, unarmed_weapon: WeaponEquippable
+    ) -> List[WeaponEquippable]:
+        actor = self.parent.parent
+        equipment = actor.equipment
+        main = equipment.slots.get(EquipmentTypes.MAIN_HAND)
+        off = equipment.slots.get(EquipmentTypes.OFF_HAND)
+        if main is None and off is None:
+            return [unarmed_weapon]
+        if not equipment.is_dual_wielding or not equipment.is_two_handing:
+            if main is not None:
+                return [main.equippable]
+            return [off.equippable]
+        if equipment.is_two_handing:
+            return [main.equippable]
+        if equipment.is_dual_wielding:
+            return [main.equippable, off.equippable]
+        raise ValueError(f"Something went terribly wrong")
+
+    def _resolve_slot_defense(
+        self,
+        slot: EquipmentTypes,
+        naked_defense: ArmorEquippable,
+    ) -> CharacterStat:
+        """
+        Resolve defense for a given equipment slot.
+
+        Prefers equipped item defense if present and valid; otherwise falls back
+        to the provided naked defense.
+        """
+        actor = self.parent.parent
+        item = actor.equipment.slots.get(slot)
+
+        if item is not None:
+            item_defense = item.equippable.get_defense(actor)
+            if item_defense is not None:
+                return item_defense
+
+        return naked_defense.get_defense(actor)
 
     def regenerate(self, diff: int) -> None:
         self.initiative.initiative.modify(diff, sudo=True)

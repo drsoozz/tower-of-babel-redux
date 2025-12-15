@@ -9,13 +9,15 @@ from components.base_component import BaseComponent
 from components.equipment_types import EquipmentTypes
 from components.stats.stat_modifier import StatModifier
 from components.stats.character_stat import CharacterStat
+from components.stats.stat_types import StatTypes
+from components.stats.stat_mod_types import StatModType
+from components.stats.damage_types import DamageTypes
 from components.stats.build_composite_stat import build_composite_stat
 from components.stats.weapon_range import WeaponRange
+from components.stats.damage import Damage
 
 if TYPE_CHECKING:
     from entity import Item, Actor
-    from components.stats.stat_types import StatTypes
-    from components.stats.damage_types import DamageTypes
 
 
 class Equippable(BaseComponent):
@@ -37,15 +39,21 @@ class Equippable(BaseComponent):
         ] = None,
     ):
         self.equipment_type = equipment_type
-        self.bonuses = bonuses
+        self.bonuses = bonuses or {}
 
     def init_hook(self) -> None:
         """Set the source of all StatModifiers to self.parent."""
-        for mods in self.bonuses.values():
+        self.make_all_sources_self(self.bonuses)
+
+    def make_all_sources_self(self, dict_to_fix: Dict) -> None:
+        for mods in dict_to_fix.values():
+            if isinstance(mods, dict):
+                self.make_all_sources_self(mods)
+                continue
             if not isinstance(mods, list):
-                mods = [mods]  # wrap single modifier in list
+                mods = [mods]
             for mod in mods:
-                mod.source = self.parent  # assign the Item as the source
+                mod.source = self.parent
 
     def equip(self, actor: Actor) -> None:
         if self.bonuses is not None:
@@ -76,7 +84,7 @@ class WeaponEquippable(Equippable):
 
     def __init__(
         self,
-        equipment_type: EquipmentTypes,
+        equipment_type: EquipmentTypes | Tuple[EquipmentTypes],
         bonuses: Optional[
             Dict[
                 StatTypes | Tuple[StatTypes, DamageTypes],
@@ -102,6 +110,12 @@ class WeaponEquippable(Equippable):
         self.attack_init_cost = attack_init_cost or {}
         self.weapon_range = weapon_range or WeaponRange(max_range=None)
 
+    def init_hook(self) -> None:
+        """Set the source of all StatModifiers to self.parent."""
+        self.make_all_sources_self(self.bonuses)
+        self.make_all_sources_self(self.attack_mods)
+        self.make_all_sources_self(self.damage_mods)
+
     def get_attack(self, actor: Actor) -> Optional[CharacterStat]:
         if not self.attack_mods:
             return None
@@ -114,7 +128,7 @@ class WeaponEquippable(Equippable):
             source=self,
         )
 
-    def get_damage(self, actor: Actor) -> Dict[DamageTypes, float]:
+    def get_damage(self, actor: Actor) -> Damage:
         if not self.damage_mods:
             return None
 
@@ -124,7 +138,7 @@ class WeaponEquippable(Equippable):
                 actor=actor, base_value=0, name="DAMAGE", stat_mods=damdict, source=self
             ).value
 
-        return final_damage_dict
+        return Damage(final_damage_dict)
 
     def get_attack_init_cost(self, actor: Actor) -> Optional[CharacterStat]:
         return self.attack_init_cost
@@ -156,6 +170,11 @@ class ArmorEquippable(Equippable):
         super().__init__(equipment_type, bonuses)
         self.defense_mods = defense_mods or {}
 
+    def init_hook(self) -> None:
+        """Set the source of all StatModifiers to self.parent."""
+        self.make_all_sources_self(self.bonuses)
+        self.make_all_sources_self(self.defense_mods)
+
     def get_defense(self, actor: Actor) -> Optional[CharacterStat]:
         """
         Build the CharacterStat for this armor's defense from the modifiers dict.
@@ -169,6 +188,38 @@ class ArmorEquippable(Equippable):
             name="DEFENSE",
             stat_mods=self.defense_mods,
             source=self,
+        )
+
+
+class GreatHammer(WeaponEquippable):
+    def __init__(self):
+        super().__init__(
+            equipment_type=(EquipmentTypes.MAIN_HAND, EquipmentTypes.OFF_HAND),
+            bonuses={
+                StatTypes.STRENGTH: StatModifier(
+                    value=2, mod_type=StatModType.FLAT, source="SELF"
+                )
+            },
+            attack_mods={
+                StatTypes.STRENGTH: StatModifier(
+                    value=0.5, mod_type=StatModType.PERCENT_MULT, source="SELF"
+                ),
+                StatTypes.DEXTERITY: StatModifier(
+                    value=0.5, mod_type=StatModType.PERCENT_MULT, source="SELF"
+                ),
+            },
+            damage_mods={
+                DamageTypes.BLUDGEONING: {
+                    StatTypes.STRENGTH: StatModifier(
+                        value=0.8, mod_type=StatModType.PERCENT_MULT, source="SELF"
+                    ),
+                    StatTypes.DEXTERITY: StatModifier(
+                        value=0.05, mod_type=StatModType.PERCENT_MULT, source="SELF"
+                    ),
+                }
+            },
+            weapon_range=WeaponRange(),
+            attack_init_cost=consts.MAX_INIT * (3 / 4),
         )
 
 
