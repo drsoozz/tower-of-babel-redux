@@ -149,6 +149,7 @@ class Item(Entity):
         char: str = "?",
         color: Tuple[int, int, int] = (255, 255, 255),
         name: str = "<Unnamed>",
+        weight: float = 0,
         consumable: Optional[Consumable] = None,
         equippable: Optional[Equippable | ArmorEquippable | WeaponEquippable] = None,
     ):
@@ -161,6 +162,7 @@ class Item(Entity):
             blocks_movement=False,
             render_order=RenderOrder.ITEM,
         )
+        self.weight = weight
 
         self.consumable = consumable
         if self.consumable:

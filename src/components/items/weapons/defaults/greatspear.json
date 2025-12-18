@@ -1,0 +1,15 @@
+{
+    "attack": {
+        "strength": 0.5,
+        "dexterity": 0.5
+    },
+    "damage": {
+        "piercing": {
+            "strength": 0.75,
+            "dexterity": 0.4
+        }
+    },
+    "init_cost": 1,
+    "slots": ["main", "off"],
+    "weight": 18
+}

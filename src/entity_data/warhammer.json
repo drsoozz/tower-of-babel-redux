@@ -1,0 +1,10 @@
+{
+    "entity_type": "item",
+    "char": "/",
+    "color": [0, 191, 255],
+    "name": "Warhammer",
+    "equippable": {
+        "equippable_type": "weapon",
+        "base_weapon": "warhammer"
+    }
+}

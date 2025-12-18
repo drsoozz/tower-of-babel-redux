@@ -1,0 +1,11 @@
+{
+    "entity_type": "item",
+    "char": "[",
+    "color": [0, 191, 255],
+    "name": "Cloth Pants",
+    "equippable": {
+        "equippable_type": "armor",
+    "base_armor": "unarmored",
+        "slots": "legs"
+    }
+}

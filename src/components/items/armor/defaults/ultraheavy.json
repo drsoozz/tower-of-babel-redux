@@ -1,0 +1,8 @@
+{
+    "defense": {
+        "dexterity": 0.10,
+        "constitution": 0.30
+    },
+    "speed_penalty": 0.10,
+    "base_weight": 15
+}

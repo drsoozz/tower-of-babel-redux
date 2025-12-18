@@ -39,6 +39,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.BLUDGEONING] >= upper_cap:
+                self.bludgeoning.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
         self.piercing = CappedStat(
@@ -52,6 +54,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.PIERCING] >= upper_cap:
+                self.piercing.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
         self.slashing = CappedStat(
@@ -65,6 +69,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.SLASHING] >= upper_cap:
+                self.slashing.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
         self.sonic = CappedStat(
@@ -78,6 +84,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.SONIC] >= upper_cap:
+                self.sonic.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -92,6 +100,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.FIRE] >= upper_cap:
+                self.fire.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -106,6 +116,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.ICE] >= upper_cap:
+                self.ice.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -120,6 +132,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.ELECTRIC] >= upper_cap:
+                self.electric.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -134,6 +148,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.ACID] >= upper_cap:
+                self.acid.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -148,6 +164,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.POISON] >= upper_cap:
+                self.poison.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -162,6 +180,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.ARCANE] >= upper_cap:
+                self.arcane.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -176,6 +196,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.ASTRAL] >= upper_cap:
+                self.astral.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -190,6 +212,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.PSYCHIC] >= upper_cap:
+                self.psychic.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -204,6 +228,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.SACRED] >= upper_cap:
+                self.sacred.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -218,6 +244,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.PROFANE] >= upper_cap:
+                self.profane.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 
@@ -232,6 +260,8 @@ class BaseDamageStats:
                     source="BASE",
                 )
             )
+            if damage_types[DamageTypes.ELDRITCH] >= upper_cap:
+                self.eldritch.raw_upper_cap = None
         except (KeyError, TypeError):
             pass
 

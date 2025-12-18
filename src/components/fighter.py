@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, List
 
 import color
+import consts
 from components.base_component import BaseComponent
 from render_order import RenderOrder
 from components.stats.stats import Stats
 from components.stats.stat_modifier import StatModifier
 from components.stats.stat_mod_types import StatModType
 from components.stats.damage_types import DamageTypes
+from components.equipment_types import EquipmentTypes
+from components.stats.weapon_range import WeaponRange
 
 if TYPE_CHECKING:
     from entity import Actor
@@ -24,6 +27,19 @@ class Fighter(BaseComponent):
         damage_resists: Optional[Dict[DamageTypes, float]],
         damage_amps: Optional[Dict[DamageTypes, float]],
         damage_masteries: Dict[DamageTypes, float],
+        natural_defense_dict: Optional[
+            Dict[EquipmentTypes, Dict[StatTypes, StatModifier | List[StatModifier]]]
+        ] = None,
+        natural_weapon_attack_dict: Optional[
+            Dict[StatTypes, StatModifier | List[StatModifier]]
+        ] = None,
+        natural_weapon_damage_dict: Optional[
+            Dict[DamageTypes, Dict[StatTypes, StatModifier | List[StatModifier]]]
+        ] = None,
+        natural_weapon_range: Optional[WeaponRange] = None,
+        natural_weapon_attack_init_cost: Optional[
+            int
+        ] = consts.DEFAULT_UNARMED_ATTACK_INIT_COST,
     ):
 
         self.stats = Stats(
@@ -31,6 +47,11 @@ class Fighter(BaseComponent):
             damage_resists=damage_resists,
             damage_amps=damage_amps,
             damage_masteries=damage_masteries,
+            natural_defense_dict=natural_defense_dict,
+            natural_weapon_attack_dict=natural_weapon_attack_dict,
+            natural_weapon_damage_dict=natural_weapon_damage_dict,
+            natural_weapon_range=natural_weapon_range,
+            natural_weapon_attack_init_cost=natural_weapon_attack_init_cost,
             parent=self,
         )
 
@@ -56,57 +77,6 @@ class Fighter(BaseComponent):
 
     def take_damage(self, amount: float) -> float:
         return self.stats.hp.modify(amount)
-
-    """
-    @property
-    def hp(self) -> int:
-        return self._hp
-
-    @hp.setter
-    def hp(self, value: int) -> None:
-        self._hp = max(0, min(value, self.max_hp))
-        if self._hp == 0 and self.parent.ai:
-            self.die()
-
-    def heal(self, amount: int) -> int:
-        if self.hp == self.max_hp:
-            return 0
-
-        new_hp_value = self.hp + amount
-
-        if new_hp_value > self.max_hp:
-            new_hp_value = self.max_hp
-
-        amount_recovered = new_hp_value - self.hp
-
-        self.hp = new_hp_value
-
-        return amount_recovered
-
-    def take_damage(self, amount: int) -> None:
-        self.hp -= amount
-
-    @property
-    def defense(self) -> int:
-        return self.base_defense + self.defense_bonus
-
-    @property
-    def power(self) -> int:
-        return self.base_power + self.power_bonus
-
-    @property
-    def defense_bonus(self) -> int:
-        if self.parent.equipment:
-            return self.parent.equipment.defense_bonus
-        else:
-            return 0
-
-    @property
-    def power_bonus(self) -> int:
-        if self.parent.equipment:
-            return self.parent.equipment.power_bonus
-        else:
-            return 0"""
 
     def die(self) -> None:
         if self.engine.player is self.parent:

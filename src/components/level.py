@@ -18,8 +18,8 @@ class Level(BaseComponent):
         self,
         current_level: int = 1,
         current_xp: int = 0,
-        level_up_base: int = 0,
-        level_up_factor: int = 150,
+        level_up_base: int = 1,
+        level_up_factor: int = 2,
         xp_given: int = 0,
     ):
         self.current_level = current_level
@@ -30,7 +30,8 @@ class Level(BaseComponent):
 
     @property
     def experience_to_next_level(self) -> int:
-        return self.level_up_base + self.current_level * self.level_up_factor
+        L = self.current_level
+        return int(self.level_up_base + self.level_up_factor * ((L + 1) * (L + 2)) / 2)
 
     @property
     def requires_level_up(self) -> bool:

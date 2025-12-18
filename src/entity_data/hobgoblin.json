@@ -1,0 +1,18 @@
+{
+    "entity_type": "actor",
+    "char": "h",
+    "color": [44, 184, 0],
+    "name": "Hobgoblin",
+    "ai_cls": "HostileEnemy",
+    "monster_tier": 1,
+    "fighter": {
+        "base_stats": {
+            "strength": 12,
+            "dexterity": 6,
+            "constitution": 9,
+            "intelligence": 1,
+            "cunning": 3,
+            "willpower": 5
+        }
+    }
+}

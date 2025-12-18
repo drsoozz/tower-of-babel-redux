@@ -111,6 +111,11 @@ class Equipment(BaseComponent):
             f"You equip the {item_name}."
         )
 
+    def too_heavy_message(self, item_name: str) -> None:
+        self.parent.gamemap.engine.message_log.add_message(
+            f"{item_name} is too heavy to equip!"
+        )
+
     def occupied_slots(self, item: Item) -> Tuple[EquipmentTypes, ...]:
         """
         Return all slots this item occupies.
@@ -178,6 +183,14 @@ class Equipment(BaseComponent):
             item (Item): The item to equip.
             add_message (bool): Whether to show a message to the player.
         """
+        if (
+            self.parent.fighter.stats.encumbrance.value + item.weight
+            > self.parent.fighter.stats.encumbrance.max_value
+        ):
+            # equipment fails
+            self.too_heavy_message(item.name)
+            return
+
         # Trigger any on-equip logic
         item.equippable.equip(self.parent)
 
@@ -228,6 +241,14 @@ class Equipment(BaseComponent):
             add_message (bool): Whether to show messages to the player.
         """
         if not equippable_item.equippable:
+            return
+
+        if (
+            self.parent.fighter.stats.encumbrance.value + equippable_item.weight
+            > self.parent.fighter.stats.encumbrance.max_value
+        ):
+            # equipment fails
+            self.too_heavy_message(equippable_item.name)
             return
 
         slots_needed = self.find_slot_for_item(equippable_item)

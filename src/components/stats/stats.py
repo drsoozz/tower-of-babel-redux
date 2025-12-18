@@ -76,7 +76,7 @@ class Stats:
         damage_amps: Optional[Dict[DamageTypes, float]],
         damage_masteries: Optional[Dict[DamageTypes, float]],
         natural_defense_dict: Optional[
-            Dict[EquipmentTypes, Dict[StatTypes, StatModifier | List[StatModifier]]]
+            Dict[StatTypes, StatModifier | List[StatModifier]]
         ] = None,
         natural_weapon_attack_dict: Optional[
             Dict[StatTypes, StatModifier | List[StatModifier]]
@@ -156,19 +156,19 @@ class Stats:
 
         self.naked_head_defense = ArmorEquippable(
             equipment_type=EquipmentTypes.HEAD,
-            defense_mods=natural_defense_dict[EquipmentTypes.HEAD],
+            defense_mods=natural_defense_dict,
         )
         self.naked_torso_defense = ArmorEquippable(
             equipment_type=EquipmentTypes.TORSO,
-            defense_mods=natural_defense_dict[EquipmentTypes.TORSO],
+            defense_mods=natural_defense_dict,
         )
         self.naked_legs_defense = ArmorEquippable(
             equipment_type=EquipmentTypes.LEGS,
-            defense_mods=natural_defense_dict[EquipmentTypes.LEGS],
+            defense_mods=natural_defense_dict,
         )
         self.naked_feet_defense = ArmorEquippable(
             equipment_type=EquipmentTypes.FEET,
-            defense_mods=natural_defense_dict[EquipmentTypes.FEET],
+            defense_mods=natural_defense_dict,
         )
 
         self.unarmed_weapon = WeaponEquippable(
@@ -179,11 +179,11 @@ class Stats:
             attack_init_cost=natural_weapon_attack_init_cost,
         )
 
-        self.flat_attack = CharacterStat(base_value=0, name="BASE")
-        self.flat_damage: Dict[DamageTypes, CharacterStat] = {}
+        self.flat_weapon_attack = CharacterStat(base_value=0, name="BASE")
+        self.flat_weapon_damage: Dict[DamageTypes, CharacterStat] = {}
         for damtype in DamageTypes:
-            self.flat_damage[damtype] = CharacterStat(base_value=0, name="BASE")
-        self.flat_defense = CharacterStat(base_value=0, name="BASE")
+            self.flat_weapon_damage[damtype] = CharacterStat(base_value=0, name="BASE")
+        self.flat_armor_defense = CharacterStat(base_value=0, name="BASE")
 
     @property
     def attack(self) -> List[float]:
@@ -191,7 +191,9 @@ class Stats:
         attacks: List[float] = []
 
         for wp in weapon:
-            attack = wp.get_attack(self.parent.parent).value + self.flat_attack.value
+            attack = (
+                wp.get_attack(self.parent.parent).value + self.flat_weapon_attack.value
+            )
             attacks.append(attack)
         return attacks
 
@@ -203,7 +205,7 @@ class Stats:
 
         for wp in weapon:
             damage = wp.get_damage(self.parent.parent)
-            damage = damage.add(Damage(self.flat_damage))
+            damage = damage.add(Damage(self.flat_weapon_damage))
             damages.append(damage)
         return damages
 
@@ -326,22 +328,38 @@ class Stats:
     def get_stat(self, stat: StatTypes) -> CharacterStat: ...
 
     @overload
-    def get_stat(self, stat: Tuple[StatTypes, DamageTypes]) -> CappedStat: ...
+    def get_stat(
+        self, stat: Tuple[StatTypes, DamageTypes]
+    ) -> CharacterStat | CappedStat: ...
 
     def get_stat(
         self, stat: StatTypes | Tuple[StatTypes, DamageTypes]
     ) -> CharacterStat | CappedStat:
-        if isinstance(stat, StatTypes):
-            stat_obj = getattr(self, stat.normalized)
-            if isinstance(stat_obj, Resource):
-                return stat_obj.max
-            return stat_obj
+        if isinstance(stat, (tuple, list)):
+            if stat[0] == StatTypes.FLAT_WEAPON_DAMAGE:
+                # 1st element is flat_weapon_damage, second is DamageType
+                return self.flat_weapon_damage[stat[1]]
+            # else, is either for damage resists/amps/masteries
+            damage_stat_type, damage_type = stat
+            return getattr(
+                getattr(self, damage_stat_type.normalized),
+                damage_type.normalized,
+            )
 
-        damage_stat_type, damage_type = stat
-        return getattr(
-            getattr(self, damage_stat_type.normalized),
-            damage_type.normalized,
-        )
+        if stat == StatTypes.GLOBAL_SPEED:
+            return self.initiative.global_speed
+        if stat == StatTypes.ATTACK_SPEED:
+            return self.initiative.attack_speed
+        if stat == StatTypes.MOVEMENT_SPEED:
+            return self.initiative.movement_speed
+        if stat == StatTypes.CASTING_SPEED:
+            return self.initiative.casting_speed
+
+        stat_obj = getattr(self, stat.normalized)
+        if isinstance(stat_obj, Resource):
+            # to get the CappedStat from resource, return stat_obj.max, NOT stat_obj
+            return stat_obj.max
+        return stat_obj
 
     # ################# #
     # STAT CONSTRUCTORS #
@@ -459,7 +477,7 @@ class Stats:
             base_value=self.carrying_capacity.max_value, name="BASE"
         )
         _enc_cc.add_modifier(
-            StatModifier(value=0.5, mod_type=StatModType.PERCENT_MULT, source="BASE")
+            StatModifier(value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE")
         )
 
         encumbrance.max.add_modifier(

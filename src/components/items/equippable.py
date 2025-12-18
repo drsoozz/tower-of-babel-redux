@@ -40,10 +40,12 @@ class Equippable(BaseComponent):
     ):
         self.equipment_type = equipment_type
         self.bonuses = bonuses or {}
+        self.weight = 0
 
     def init_hook(self) -> None:
         """Set the source of all StatModifiers to self.parent."""
         self.make_all_sources_self(self.bonuses)
+        self.weight = self.parent.weight
 
     def make_all_sources_self(self, dict_to_fix: Dict) -> None:
         for mods in dict_to_fix.values():
@@ -56,7 +58,9 @@ class Equippable(BaseComponent):
                 mod.source = self.parent
 
     def equip(self, actor: Actor) -> None:
-        if self.bonuses is not None:
+        actor.fighter.stats.encumbrance.modify(self.weight)
+
+        if self.bonuses == {}:
             return
         stats = actor.fighter.stats
         for stat_type, modifiers in self.bonuses.items():
@@ -67,10 +71,12 @@ class Equippable(BaseComponent):
                 stat.add_modifier(mod)
 
     def unequip(self, actor: Actor) -> None:
-        if self.bonuses is not None:
+        actor.fighter.stats.encumbrance.modify(-self.weight)
+
+        if self.bonuses == {}:
             return
         stats = actor.fighter.stats
-        for stat_type in self.bonuses:
+        for stat_type, _ in self.bonuses.items():
             stat = stats.get_stat(stat_type)
             stat.remove_all_from_source(self.parent)
 
@@ -102,7 +108,7 @@ class WeaponEquippable(Equippable):
     ):
         if equipment_type not in self.VALID_EQUIPMENT_TYPES:
             raise ValueError(
-                f"Invalid armor slot: {equipment_type.value}. Must be one of {[slot.value for slot in self.VALID_EQUIPMENT_TYPES]}"
+                f"Invalid weapon slot: {equipment_type.value}. Must be one of {[slot.value for slot in self.VALID_EQUIPMENT_TYPES]}"
             )
         super().__init__(equipment_type, bonuses)
         self.attack_mods = attack_mods or {}

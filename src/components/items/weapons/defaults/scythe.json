@@ -1,0 +1,15 @@
+{
+    "attack": {
+        "strength": 0.25,
+        "dexterity": 0.75
+    },
+    "damage": {
+        "slashing": {
+            "strength": 0.25,
+            "dexterity": 0.6
+        }
+    },
+    "init_cost": 0.75,
+    "slots": ["main", "off"],
+    "weight": 7
+}

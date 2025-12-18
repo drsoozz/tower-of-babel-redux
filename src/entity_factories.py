@@ -31,7 +31,7 @@ player = Actor(
         damage_masteries=None,
     ),
     inventory=Inventory(capacity=26),
-    level=Level(level_up_base=200),
+    level=Level(),
 )
 
 orc_stats = {

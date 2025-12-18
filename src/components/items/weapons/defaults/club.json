@@ -1,0 +1,14 @@
+{
+    "attack": {
+        "strength": 0.75,
+        "dexterity": 0.25
+    },
+    "damage": {
+        "bludgeoning": {
+            "strength": 0.85
+        }
+    },
+    "init_cost": 0.75,
+    "slots": ["main"],
+    "weight": 4
+}

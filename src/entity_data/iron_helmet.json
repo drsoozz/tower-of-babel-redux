@@ -1,0 +1,11 @@
+{
+    "entity_type": "item",
+    "char": "[",
+    "color": [0, 191, 255],
+    "name": "Iron Helmet",
+    "equippable": {
+        "equippable_type": "armor",
+    "base_armor": "heavy",
+        "slots": "head"
+    }
+}

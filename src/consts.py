@@ -23,26 +23,9 @@ MAX_INIT = int(1e6)
 UPPER_RESIST_CAP = 0.75
 
 DEFAULT_DEFENSE_DICT = {
-    EquipmentTypes.HEAD: {
-        StatTypes.DEXTERITY: StatModifier(
-            value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
-        )
-    },
-    EquipmentTypes.TORSO: {
-        StatTypes.DEXTERITY: StatModifier(
-            value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
-        )
-    },
-    EquipmentTypes.LEGS: {
-        StatTypes.DEXTERITY: StatModifier(
-            value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
-        )
-    },
-    EquipmentTypes.FEET: {
-        StatTypes.DEXTERITY: StatModifier(
-            value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
-        )
-    },
+    StatTypes.DEXTERITY: StatModifier(
+        value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE"
+    )
 }
 
 # unarmed strike
@@ -68,3 +51,12 @@ DEFAULT_UNARMED_DAMAGE_DICT = {
 DEFAULT_UNARMED_WEAPON_RANGE = WeaponRange(max_range=None)
 
 DEFAULT_UNARMED_ATTACK_INIT_COST = MAX_INIT / 2
+
+
+HEAD_WEIGHT_MODIFIER = 0.5
+TORSO_WEIGHT_MODIFIER = 3
+LEGS_WEIGHT_MODIFIER = 1.5
+FEET_WEIGHT_MODIFIER = 1
+
+
+EXP_BASE = 1

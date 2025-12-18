@@ -1,0 +1,30 @@
+{
+    "entity_type": "item",
+    "char": "/",
+    "color": [0, 191, 255],
+    "name": "Goblin Shiv",
+    "weight": 0.1,
+    "equippable": {
+        "equippable_type": "weapon",
+        "base_weapon": "dagger",
+        "bonuses": [
+            {
+                "stat": "dexterity",
+                "mod_type": "flat",
+                "value": 1
+            },
+            {
+                "stat": "flat weapon damage",
+                "damage_type": "poison",
+                "mod_type": "flat",
+                "value": 1
+            },
+            {
+                "stat": "damage resists",
+                "damage_type": "poison",
+                "mod_type": "flat",
+                "value": 0.10
+            }
+        ]
+    }
+}

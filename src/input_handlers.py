@@ -840,6 +840,11 @@ class MainGameEventHandler(EventHandler):
         ):
             return QueryRestLoopHandler(self.engine)
 
+        if key == tcod.event.KeySym.I and modifier & (
+            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
+        ):
+            return InventoryDropHandler(self.engine)
+
         if key in MOVE_KEYS:
             dx, dy = MOVE_KEYS[key]
             action = BumpAction(player, dx, dy)
@@ -853,8 +858,6 @@ class MainGameEventHandler(EventHandler):
             action = PickupAction(player)
         elif key == tcod.event.KeySym.I:
             return InventoryActivateHandler(self.engine)
-        elif key == tcod.event.KeySym.D:
-            return InventoryDropHandler(self.engine)
         elif key == tcod.event.KeySym.L:
             return LookHandler(self.engine)
         elif key == tcod.event.KeySym.TAB:

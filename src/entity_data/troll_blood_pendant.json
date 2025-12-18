@@ -1,0 +1,17 @@
+{
+    "entity_type": "item",
+    "char": "/",
+    "color": [0, 191, 255],
+    "name": "Troll-Blood Pendant",
+    "weight": 0.5,
+    "equippable": {
+        "slots": "necklace",
+        "bonuses": [
+            {
+                "stat": "hp regen",
+                "mod_type": "percent mult",
+                "value": 2
+            }
+        ]
+    }
+}

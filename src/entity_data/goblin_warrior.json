@@ -1,0 +1,44 @@
+{
+    "entity_type": "actor",
+    "char": "g",
+    "color": [61, 255, 0],
+    "name": "Goblin Warrior",
+    "ai_cls": "HostileEnemy",
+    "monster_tier": 0,
+    "fighter": {
+        "base_stats": {
+            "strength": 3,
+            "dexterity": 6,
+            "constitution": 4,
+            "intelligence": 2,
+            "cunning": 5,
+            "willpower": 1
+        },
+        "damage_resists": {
+            "poison": 0.15
+        },
+        "damage_amps": {
+            "poison": 0.1
+        },
+        "damage_masteries": {
+            "poison": 5
+        },
+        "natural_defense_dict": {
+            "dexterity": 0.25
+        },
+        "natural_weapon_attack_dict": {
+            "dexterity": 1
+        },
+        "natural_weapon_damage_dict": {
+            "piercing": {
+                "strength": 0.05,
+                "dexterity": 0.10
+            },
+            "poison": {
+                "cunning": 0.10
+            }
+        },
+        "natural_weapon_range": null,
+        "natural_weapon_attack_init_cost": 0.25
+    }
+}

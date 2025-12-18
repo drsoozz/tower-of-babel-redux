@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from typing import Dict, Iterator, List, Tuple, TYPE_CHECKING
+from load_entity import load_entity
 
 import tcod
 
@@ -19,9 +20,10 @@ max_items_by_floor = [
 ]
 
 max_monsters_by_floor = [
-    (1, 2),
-    (4, 3),
-    (6, 5),
+    (1, 4),
+    (3, 5),
+    (5, 6),
+    (7, 7),
 ]
 
 item_chances: Dict[int, List[Tuple[Entity, int]]] = {
@@ -36,10 +38,10 @@ item_chances: Dict[int, List[Tuple[Entity, int]]] = {
 }
 
 enemy_chances: Dict[int, List[Tuple[Entity, int]]] = {
-    0: [(entity_factories.orc, 80)],
-    3: [(entity_factories.troll, 15)],
-    5: [(entity_factories.troll, 30)],
-    7: [(entity_factories.troll, 60)],
+    0: [("goblin_warrior", 100)],
+    3: [("hobgoblin", 15)],
+    5: [("hobgoblin", 30)],
+    7: [("hobgoblin", 60)],
 }
 
 
@@ -69,7 +71,10 @@ def get_entities_at_random(
             break
         else:
             for value in values:
-                entity = value[0]
+                if isinstance(value[0], str):
+                    entity = load_entity(value[0])
+                else:
+                    entity = value[0]
                 weighted_chance = value[1]
 
                 entity_weighted_chances[entity] = weighted_chance

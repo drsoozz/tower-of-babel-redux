@@ -2,9 +2,9 @@ from enum import auto
 from base_enum import BaseEnum
 
 
-class StatModType(BaseEnum):
-    FLAT = auto()
-    PERCENT_ADD = auto()
-    PERCENT_MULT = auto()
-    FLAT_RIGID = auto()
-    FUNC = auto()
+class StatModType(str, BaseEnum):
+    FLAT = "flat"
+    PERCENT_ADD = "percent add"
+    PERCENT_MULT = "percent mult"
+    FLAT_RIGID = "flat rigid"
+    FUNC = "func"
