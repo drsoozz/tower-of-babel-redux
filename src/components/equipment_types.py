@@ -48,3 +48,4 @@ class EquipmentTypes(str, BaseEnum):
     ACCESSORY_2 = "accessory 2"
     ACCESSORY_3 = "accessory 3"
     ACCESSORY_4 = "accessory 4"
+    ESSENCE = "essence"

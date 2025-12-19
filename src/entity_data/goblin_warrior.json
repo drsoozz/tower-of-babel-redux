@@ -5,6 +5,8 @@
     "name": "Goblin Warrior",
     "ai_cls": "HostileEnemy",
     "monster_tier": 0,
+    "monster_rarity": "common",
+    "monster_item": "goblin_shiv",
     "fighter": {
         "base_stats": {
             "strength": 3,
@@ -15,10 +17,10 @@
             "willpower": 1
         },
         "damage_resists": {
-            "poison": 0.15
+            "poison": 0.10
         },
         "damage_amps": {
-            "poison": 0.1
+            "poison": 0.075
         },
         "damage_masteries": {
             "poison": 5
@@ -40,5 +42,36 @@
         },
         "natural_weapon_range": null,
         "natural_weapon_attack_init_cost": 0.25
-    }
+    },
+    "essence": [
+            {
+                "stat": "dexterity",
+                "mod_type": "flat",
+                "value": 1
+            },
+            {
+                "stat": "flat weapon damage",
+                "damage_type": "poison",
+                "mod_type": "flat",
+                "value": 0.5
+            },
+            {
+                "stat": "damage resists",
+                "damage_type": "poison",
+                "mod_type": "flat",
+                "value": 0.05
+            },
+            {
+                "stat": "damage masteries",
+                "damage_type": "poison",
+                "mod_type": "flat",
+                "value": 1
+            },
+            {
+                "stat": "damage masteries",
+                "damage_type": "piercing",
+                "mod_type": "flat",
+                "value": 1
+            }
+        ]
 }

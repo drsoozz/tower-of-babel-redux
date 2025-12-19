@@ -76,7 +76,7 @@ class ConfusionConsumable(Consumable):
         self.consume()
 
 
-class HealingConsumable(Consumable):
+class HealingPotion(Consumable):
     def __init__(self, amount: int):
         self.amount = amount
 

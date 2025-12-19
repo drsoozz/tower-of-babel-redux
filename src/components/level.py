@@ -53,6 +53,8 @@ class Level(BaseComponent):
     def increase_level(self) -> None:
         self.current_xp -= self.experience_to_next_level
 
+        self.parent.essence.on_level_up()
+
         self.current_level += 1
 
     def increase_stat(self, stat: StatTypes) -> None:

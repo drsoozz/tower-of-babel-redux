@@ -11,3 +11,7 @@ class QuitWithoutSaving(SystemExit):
 
 class QuitToMainMenu(Exception):
     """Can be raised to exit to the main menu and save"""
+
+
+class NotEnoughMoney(Exception):
+    """Not enough money to proceed!"""

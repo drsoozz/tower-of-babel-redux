@@ -702,6 +702,8 @@ class InventoryActivateHandler(InventoryEventHandler):
             # Return the action for the selected item.
             return item.consumable.get_action(self.engine.player)
         elif item.equippable:
+            if item.equippable.is_essence:
+                return actions.EquipEssenceAction(self.engine.player, item)
             return actions.EquipAction(self.engine.player, item)
         else:
             return None

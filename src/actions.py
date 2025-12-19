@@ -111,6 +111,18 @@ class EquipAction(Action):
         self.apply_cost()
 
 
+class EquipEssenceAction(Action):
+
+    def __init__(self, entity: Actor, item: Item):
+        super().__init__(entity)
+
+        self.item = item
+
+    def perform(self) -> None:
+        self.entity.essence.equip(self.item)
+        self.entity.inventory.items.remove(self.item)
+
+
 class WaitAction(Action):
     def perform(
         self,

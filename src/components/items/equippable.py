@@ -16,6 +16,8 @@ from components.stats.build_composite_stat import build_composite_stat
 from components.stats.weapon_range import WeaponRange
 from components.stats.damage import Damage
 
+from components.wallet.currencies import Currency
+
 if TYPE_CHECKING:
     from entity import Item, Actor
 
@@ -41,6 +43,7 @@ class Equippable(BaseComponent):
         self.equipment_type = equipment_type
         self.bonuses = bonuses or {}
         self.weight = 0
+        self.is_essence = equipment_type == EquipmentTypes.ESSENCE
 
     def init_hook(self) -> None:
         """Set the source of all StatModifiers to self.parent."""
@@ -79,6 +82,25 @@ class Equippable(BaseComponent):
         for stat_type, _ in self.bonuses.items():
             stat = stats.get_stat(stat_type)
             stat.remove_all_from_source(self.parent)
+
+
+class EssenceEquippable(Equippable):
+    def __init__(self, bonuses=None, tier: int = None):
+        if tier is None:
+            raise ValueError("Not given a tier for the essence being instantized.")
+        if not isinstance(tier, int):
+            raise TypeError(
+                f"Given type of essence tier was {type(tier)} intstead of `int`."
+            )
+        self.tier = tier
+        super().__init__(equipment_type=EquipmentTypes.ESSENCE, bonuses=bonuses)
+
+    def turn_into_ash(self, actor: Actor) -> None:
+        """Permanently deletes the essence and gives the player Spirit Ash"""
+        actor.inventory.delete(self.parent)
+
+        added_ash = 1 + 0.5 * self.tier
+        actor.wallet.balances += {Currency.SPIRIT_ASH: added_ash}
 
 
 class WeaponEquippable(Equippable):

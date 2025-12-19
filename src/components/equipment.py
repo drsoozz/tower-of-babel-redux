@@ -31,6 +31,25 @@ class Equipment(BaseComponent):
     """
 
     parent: Actor
+    ACCESSORIES = {
+        EquipmentTypes.ACCESSORY_1,
+        EquipmentTypes.ACCESSORY_2,
+        EquipmentTypes.ACCESSORY_3,
+        EquipmentTypes.ACCESSORY_4,
+    }
+    RINGS = {EquipmentTypes.RING_1, EquipmentTypes.RING_2}
+    EARRINGS = {EquipmentTypes.EARRING_1, EquipmentTypes.EARRING_2}
+
+    SLOT_FAMILIES: dict[EquipmentTypes, set[EquipmentTypes]] = {
+        EquipmentTypes.ACCESSORY_1: ACCESSORIES,
+        EquipmentTypes.ACCESSORY_2: ACCESSORIES,
+        EquipmentTypes.ACCESSORY_3: ACCESSORIES,
+        EquipmentTypes.ACCESSORY_4: ACCESSORIES,
+        EquipmentTypes.RING_1: RINGS,
+        EquipmentTypes.RING_2: RINGS,
+        EquipmentTypes.EARRING_1: EARRINGS,
+        EquipmentTypes.EARRING_2: EARRINGS,
+    }
 
     def __init__(self):
         """
@@ -99,16 +118,24 @@ class Equipment(BaseComponent):
         """
         return item in self.slots.values()
 
-    def unequip_message(self, item_name: str) -> None:
+    def unequip_message(self, item_name: str, slots: Tuple[EquipmentTypes]) -> None:
         """Send a message to the player indicating an item was removed."""
+        if len(slots) > 1:
+            self.parent.gamemap.engine.message_log.add_message(
+                f"You remove the {item_name} from the {[slot.value for slot in slots]} slots."
+            )
         self.parent.gamemap.engine.message_log.add_message(
-            f"You remove the {item_name}."
+            f"You remove the {item_name} from the {slots[0].value} slot."
         )
 
-    def equip_message(self, item_name: str) -> None:
+    def equip_message(self, item_name: str, slots: Tuple[EquipmentTypes]) -> None:
         """Send a message to the player indicating an item was equipped."""
+        if len(slots) > 1:
+            self.parent.gamemap.engine.message_log.add_message(
+                f"You equip the {item_name} to the {[slot.value for slot in slots]} slots."
+            )
         self.parent.gamemap.engine.message_log.add_message(
-            f"You equip the {item_name}."
+            f"You equip the {item_name} to the {slots[0].value} slot."
         )
 
     def too_heavy_message(self, item_name: str) -> None:
@@ -149,31 +176,35 @@ class Equipment(BaseComponent):
         """
         Determine which slot(s) the item should occupy when equipped.
 
-        Multi-slot items (e.g., two-handed weapons) always occupy all their declared
-        slots. Single-slot items that normally go in MAIN_HAND may occupy OFF_HAND
-        if MAIN_HAND is occupied (dual-wield logic).
-
-        Args:
-            item (Item): The item to equip.
-
-        Returns:
-            Tuple[EquipmentTypes, ...]: The actual slot(s) the item will occupy.
+        This function is best-effort and non-throwing. If no preferred slot
+        is available, it falls back to the item's declared slot(s).
         """
         occupied = self.occupied_slots(item)
 
-        # Multi-slot items always occupy their declared slots
+        # Multi-slot items always occupy declared slots
         if len(occupied) > 1:
             return occupied
 
-        # Single-slot item logic
         slot = occupied[0]
+
+        # Dual-wield logic
         if slot == EquipmentTypes.MAIN_HAND:
-            # Prefer MAIN_HAND if free, else use OFF_HAND if available
             if self.slots[EquipmentTypes.MAIN_HAND] is None:
                 return (EquipmentTypes.MAIN_HAND,)
-            elif self.slots[EquipmentTypes.OFF_HAND] is None:
+            if self.slots[EquipmentTypes.OFF_HAND] is None:
                 return (EquipmentTypes.OFF_HAND,)
-        return occupied
+            return (EquipmentTypes.MAIN_HAND,)
+
+        # Slot-family logic (accessories, rings, earrings)
+        family = self.SLOT_FAMILIES.get(slot)
+        if family is not None:
+            for candidate in family:
+                if self.slots[candidate] is None:
+                    return (candidate,)
+            return (slot,)
+
+        # Fixed single-slot item
+        return (slot,)
 
     def equip_to_slot(self, item: Item, add_message: bool = True) -> None:
         """
@@ -183,13 +214,6 @@ class Equipment(BaseComponent):
             item (Item): The item to equip.
             add_message (bool): Whether to show a message to the player.
         """
-        if (
-            self.parent.fighter.stats.encumbrance.value + item.weight
-            > self.parent.fighter.stats.encumbrance.max_value
-        ):
-            # equipment fails
-            self.too_heavy_message(item.name)
-            return
 
         # Trigger any on-equip logic
         item.equippable.equip(self.parent)
@@ -206,7 +230,7 @@ class Equipment(BaseComponent):
             self.slots[slot] = item
 
         if add_message:
-            self.equip_message(item.name)
+            self.equip_message(item.name, slots=slots_needed)
 
     def unequip_from_slot(self, slot: EquipmentTypes, add_message: bool = True) -> None:
         """
@@ -223,12 +247,18 @@ class Equipment(BaseComponent):
         # Trigger any on-unequip logic
         current_item.equippable.unequip(self.parent)
 
+        current_slots = self.current_slots(current_item)
+
         # Remove the item from all slots it occupies
-        for occupied in self.occupied_slots(current_item):
-            self.slots[occupied] = None
+        for current in current_slots:
+            self.slots[current] = None
 
         if add_message:
-            self.unequip_message(current_item.name)
+            self.unequip_message(current_item.name, slots=current_slots)
+
+    def current_slots(self, item: Item) -> Tuple[EquipmentTypes, ...]:
+        """Returns the slots this item is currently occupying"""
+        return tuple(slot for slot, equipped in self.slots.items() if equipped is item)
 
     def toggle_equip(self, equippable_item: Item, add_message: bool = True) -> None:
         """
@@ -240,7 +270,10 @@ class Equipment(BaseComponent):
             equippable_item (Item): The item to toggle.
             add_message (bool): Whether to show messages to the player.
         """
-        if not equippable_item.equippable:
+
+        if self.item_is_equipped(equippable_item):
+            current_slots = self.current_slots(equippable_item)
+            self.unequip_from_slot(current_slots[0])
             return
 
         if (
@@ -248,10 +281,19 @@ class Equipment(BaseComponent):
             > self.parent.fighter.stats.encumbrance.max_value
         ):
             # equipment fails
+
+            print(self.parent.fighter.stats.encumbrance.value)
+            print(equippable_item.weight)
+            print(self.parent.fighter.stats.encumbrance.max_value)
+
             self.too_heavy_message(equippable_item.name)
             return
 
         slots_needed = self.find_slot_for_item(equippable_item)
+        # if it's an item that can fit in multiple slots, like an accessory, find_slot_for_item
+        # will either return it's actual slot, or a free slot that is "homogeneous" with it
+        # . i.e. if it's an accessory and ACCESSORY_1 is full but ACCESSORY_2 is not, it will return
+        # ACCESSORY_2, allowing for it to be equipped there
 
         # If the item is already equipped in all required slots, unequip it
         if all(self.slots.get(slot) == equippable_item for slot in slots_needed):

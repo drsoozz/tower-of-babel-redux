@@ -1,0 +1,35 @@
+{
+    "entity_type": "item",
+    "char": "/",
+    "color": [0, 191, 255],
+    "name": "Hobgoblin's Pauldrons",
+    "weight": 2.1,
+    "equippable": {
+        "slots": "arms",
+        "bonuses": [
+            {
+                "stat": "energy regen",
+                "mod_type": "percent mult",
+                "value": 1.25
+            },
+            {
+                "stat": "damage resists",
+                "damage_type": "slashing",
+                "mod_type": "flat",
+                "value": 0.075
+            },
+            {
+                "stat": "damage resists",
+                "damage_type": "piercing",
+                "mod_type": "flat",
+                "value": 0.075
+            },
+            {
+                "stat": "damage resists",
+                "damage_type": "bludgeoning",
+                "mod_type": "flat",
+                "value": 0.05
+            }
+        ]
+    }
+}

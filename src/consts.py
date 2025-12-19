@@ -6,6 +6,7 @@ from components.stats.stat_mod_types import StatModType
 from components.stats.damage_types import DamageTypes
 from components.stats.weapon_range import WeaponRange
 from components.equipment_types import EquipmentTypes
+from components.loot.rarity_types import RarityTypes
 
 BASE_PATH = Path("src")
 TILESET_PATH = Path(BASE_PATH, "tilesets", "Dullard_Exponent_12x12.png")
@@ -58,5 +59,27 @@ TORSO_WEIGHT_MODIFIER = 3
 LEGS_WEIGHT_MODIFIER = 1.5
 FEET_WEIGHT_MODIFIER = 1
 
-
 EXP_BASE = 1
+
+SOUL_COIN_REWARD_BASE = 10
+SOUL_COIN_REWARD_LEVEL_FACTOR = 10
+SOUL_COIN_REWARD_LEVEL_EXPONENT = 1.43713005
+SOUL_COIN_REWARD_VARIANCE = 0.25
+
+ESSENCE_RARITY_TABLE = {
+    RarityTypes.COMMON: 1 / 2,
+    RarityTypes.UNCOMMON: 1 / 160,
+    RarityTypes.RARE: 1 / 80,
+    RarityTypes.VERY_RARE: 1 / 40,
+    RarityTypes.LEGENDARY: 1 / 20,
+    RarityTypes.MYTHICAL: 1 / 10,
+}
+
+ITEM_RARITY_TABLE = {
+    RarityTypes.COMMON: 1 / 2,
+    RarityTypes.UNCOMMON: 1 / 50,
+    RarityTypes.RARE: 1 / 25,
+    RarityTypes.VERY_RARE: 1 / 12,
+    RarityTypes.LEGENDARY: 1 / 6,
+    RarityTypes.MYTHICAL: 1 / 3,
+}

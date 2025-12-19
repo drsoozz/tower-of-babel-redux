@@ -23,3 +23,10 @@ class Inventory(BaseComponent):
         item.place(self.parent.x, self.parent.y, self.gamemap)
 
         self.engine.message_log.add_message(f"You dropped the {item.name}.")
+
+    def delete(self, item: Item, message: str = None) -> None:
+        """Deletes an item permanently."""
+        self.items.remove(item)
+
+        if message is not None:
+            self.engine.message_log.add_message(message)

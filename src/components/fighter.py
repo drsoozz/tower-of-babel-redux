@@ -92,6 +92,7 @@ class Fighter(BaseComponent):
         self.parent.ai = None
 
         self.engine.player.level.add_xp(self.parent.level.xp_given)
+        self.parent.loot.disperse_loot(killer=self.engine.player)
 
         self.parent.name = f"remains of {self.parent.name}"
         self.parent.render_order = RenderOrder.CORPSE

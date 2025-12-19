@@ -5,6 +5,8 @@
     "name": "Hobgoblin",
     "ai_cls": "HostileEnemy",
     "monster_tier": 1,
+    "monster_rarity": "common",
+    "monster_item": "hobgoblins_pauldrons",
     "fighter": {
         "base_stats": {
             "strength": 12,
@@ -14,5 +16,22 @@
             "cunning": 3,
             "willpower": 5
         }
-    }
+    },
+    "essence": [
+        {
+            "stat": "strength",
+            "mod_type": "flat",
+            "value": 2
+        },
+        {
+            "stat": "dexterity",
+            "mod_type": "flat",
+            "value": 2
+        },
+        {
+            "stat": "willpower",
+            "mod_type": "flat",
+            "value": 2
+        }
+    ]
 }

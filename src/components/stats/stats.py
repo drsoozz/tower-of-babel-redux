@@ -458,11 +458,8 @@ class Stats:
         _cc_str.add_modifier(
             StatModifier(value=10, mod_type=StatModType.PERCENT_MULT, source="BASE")
         )
-
         carrying_capacity.max.add_modifier(
-            StatModifier(
-                value=_cc_str, mod_type=StatModType.PERCENT_MULT, source="BASE"
-            )
+            StatModifier(value=_cc_str, mod_type=StatModType.FLAT, source="BASE")
         )
 
         carrying_capacity.minimize()
@@ -474,7 +471,7 @@ class Stats:
         encumbrance = Resource(base_value=0, name=StatTypes.ENCUMBRANCE.value)
 
         _enc_cc = CharacterStat(
-            base_value=self.carrying_capacity.max_value, name="BASE"
+            base_value=self.carrying_capacity.max.value, name="BASE"
         )
         _enc_cc.add_modifier(
             StatModifier(value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE")

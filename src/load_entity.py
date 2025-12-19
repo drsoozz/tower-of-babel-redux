@@ -11,7 +11,12 @@ from components.level import Level
 from components.inventory import Inventory
 from components.equipment import Equipment
 from entity import Item, Actor
-from components.items.equippable import Equippable, ArmorEquippable, WeaponEquippable
+from components.items.equippable import (
+    Equippable,
+    EssenceEquippable,
+    ArmorEquippable,
+    WeaponEquippable,
+)
 from components.items.weapons.default_weapons import (
     load_default_weapon_args,
     create_attack_dict,
@@ -29,6 +34,10 @@ from components.stats.damage_types import DamageTypes
 from components.stats.stat_mod_types import StatModType
 from components.stats.stat_modifier import StatModifier
 from components.equipment_types import EquipmentTypes
+from components.essence.essence import Essence
+from components.wallet.wallet import Wallet
+from components.loot.loot import Loot
+from components.loot.rarity_types import RarityTypes
 
 if TYPE_CHECKING:
     pass
@@ -74,7 +83,10 @@ def load_item_components(data: Dict) -> Dict:
 
 
 def load_equippable(data: Dict) -> Dict:
-    match data.get("equippable_type", None):
+    equippable_dict: Dict = data.get("equippable", None)
+    if not isinstance(equippable_dict, dict):
+        raise ValueError(f" equippable dict is not a dict? is missing probably")
+    match equippable_dict.get("equippable_type"):
         case "armor":
             return load_armor(data)
         case "weapon":
@@ -218,12 +230,18 @@ def load_actor(data: Dict) -> Dict:
     fighter = load_fighter_module(data)
     inventory = load_inventory_module(data)
     level = load_level_module(data)
+    essence = load_essence_module(data)
+    wallet = load_wallet_module(data)
+    loot = load_loot_module(data)
     args = {
         "ai_cls": ai_cls,
         "fighter": fighter,
         "inventory": inventory,
         "level": level,
         "equipment": Equipment(),
+        "essence": essence,
+        "wallet": wallet,
+        "loot": loot,
     }
     return args
 
@@ -341,3 +359,61 @@ def load_level_module(data: Dict) -> Level:
 
 def get_exp_given_from_monster_tier(monster_tier: int) -> int:
     return monster_tier + consts.EXP_BASE
+
+
+def load_essence_module(data: Dict) -> Essence:
+    return Essence()
+
+
+def load_wallet_module(data: Dict) -> Wallet:
+    return Wallet(starting_balance=None)  # why do monsters need wallets anyways?
+
+
+def load_loot_module(data: Dict) -> Wallet:
+    is_player = False
+
+    monster_rarity = RarityTypes.enum_from_string(data.get("monster_rarity"))
+    monster_tier = data.get("monster_tier")
+    monster_essence = load_essence(data)
+
+    monster_item = load_entity(data.get("monster_item"))
+    return Loot(
+        is_player=is_player,
+        monster_rarity=monster_rarity,
+        monster_tier=monster_tier,
+        monster_essence=monster_essence,
+        monster_item=monster_item,
+    )
+
+
+def load_essence(data: Dict) -> Item:
+    monster_name = data.get("name")
+    monster_tier = data.get("monster_tier")
+    bonuses_data = data.get("essence")
+
+    bonuses: Dict = {}
+    if bonuses_data != {}:
+        for bonus in bonuses_data:
+            bonus: Dict
+            stat_type = StatTypes.enum_from_string(bonus.get("stat"))
+            damage_type = bonus.get("damage_type", None)
+            if damage_type is not None:
+                damage_type = DamageTypes.enum_from_string(damage_type)
+            value = bonus.get("value")
+            mod_type = StatModType.enum_from_string(bonus.get("mod_type"))
+            stat_modifier = StatModifier(
+                value=value, mod_type=mod_type, source="WILL_BE_REWRITTEN"
+            )
+            if damage_type is not None:
+                bonuses[(stat_type, damage_type)] = stat_modifier
+            else:
+                bonuses[stat_type] = stat_modifier
+
+    monster_essence = Item(
+        name=f"{monster_name} Essence",
+        char="☼",
+        color=data.get("color"),
+        weight=0,
+        equippable=EssenceEquippable(bonuses=bonuses, tier=monster_tier),
+    )
+    return monster_essence

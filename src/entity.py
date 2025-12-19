@@ -8,6 +8,7 @@ from typing import Optional, Tuple, Type, Self, TYPE_CHECKING, Union
 import consts
 from render_order import RenderOrder
 
+
 if TYPE_CHECKING:
     from components.ai import BaseAI
     from components.consumable import Consumable
@@ -16,11 +17,15 @@ if TYPE_CHECKING:
         Equippable,
         ArmorEquippable,
         WeaponEquippable,
+        EssenceEquippable,
     )
     from components.fighter import Fighter
     from components.inventory import Inventory
     from components.level import Level
     from game_map import GameMap
+    from components.essence.essence import Essence
+    from components.wallet.wallet import Wallet
+    from components.loot.loot import Loot
 
 
 class Entity:
@@ -100,6 +105,9 @@ class Actor(Entity):
         fighter: Fighter,
         inventory: Inventory,
         level: Level,
+        essence: Essence,
+        wallet: Wallet,
+        loot: Loot,
     ):
         super().__init__(
             x=x,
@@ -126,6 +134,16 @@ class Actor(Entity):
         self.level = level
         self.level.parent = self
 
+        self.essence = essence
+        self.essence.parent = self
+        self.essence.init_hook()
+
+        self.wallet = wallet
+        self.wallet.parent = self
+
+        self.loot = loot
+        self.loot.parent = self
+
     @property
     def is_alive(self) -> bool:
         """Returns True as long as this actor can perform actions."""
@@ -151,7 +169,9 @@ class Item(Entity):
         name: str = "<Unnamed>",
         weight: float = 0,
         consumable: Optional[Consumable] = None,
-        equippable: Optional[Equippable | ArmorEquippable | WeaponEquippable] = None,
+        equippable: Optional[
+            Equippable | EssenceEquippable | ArmorEquippable | WeaponEquippable
+        ] = None,
     ):
         super().__init__(
             x=x,
