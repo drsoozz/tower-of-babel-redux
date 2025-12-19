@@ -78,6 +78,9 @@ class Stats:
         natural_defense_dict: Optional[
             Dict[StatTypes, StatModifier | List[StatModifier]]
         ] = None,
+        natural_shield_defense_dict: Optional[
+            Dict[StatTypes, StatModifier | List[StatModifier]]
+        ] = None,
         natural_weapon_attack_dict: Optional[
             Dict[StatTypes, StatModifier | List[StatModifier]]
         ] = None,
@@ -94,12 +97,16 @@ class Stats:
         # fixing dicts (these ahve to be done like this cause otherwise you get Pylint W0102 (dangerous default argument))
         if natural_defense_dict is None:
             natural_defense_dict = deepcopy(consts.DEFAULT_DEFENSE_DICT)
+        if natural_shield_defense_dict is None:
+            natural_shield_defense_dict = deepcopy(consts.DEFAULT_SHIELD_DICT)
         if natural_weapon_attack_dict is None:
             natural_weapon_attack_dict = deepcopy(consts.DEFAULT_UNARMED_ATTACK_DICT)
         if natural_weapon_damage_dict is None:
             natural_weapon_damage_dict = deepcopy(consts.DEFAULT_UNARMED_DAMAGE_DICT)
         if natural_weapon_range is None:
             natural_weapon_range = deepcopy(consts.DEFAULT_UNARMED_WEAPON_RANGE)
+        if natural_weapon_attack_init_cost is None:
+            natural_weapon_attack_init_cost = consts.DEFAULT_UNARMED_ATTACK_INIT_COST
 
         self.strength = CharacterStat(
             base_value=base_stats[StatTypes.STRENGTH], name=StatTypes.STRENGTH.value
@@ -169,6 +176,11 @@ class Stats:
         self.naked_feet_defense = ArmorEquippable(
             equipment_type=EquipmentTypes.FEET,
             defense_mods=natural_defense_dict,
+        )
+
+        self.naked_shield_defense = ArmorEquippable(
+            equipment_type=EquipmentTypes.OFF_HAND,
+            defense_mods=natural_shield_defense_dict,
         )
 
         self.unarmed_weapon = WeaponEquippable(
@@ -266,12 +278,20 @@ class Stats:
         )
 
     @property
+    def shield_defense(self) -> CharacterStat:
+        return self._resolve_slot_defense(
+            slot=EquipmentTypes.OFF_HAND,
+            naked_defense=self.naked_shield_defense,
+        )
+
+    @property
     def total_defense(self) -> float:
         return (
             self.head_defense.value
             + self.torso_defense.value
             + self.legs_defense.value
             + self.feet_defense.value
+            + self.shield_defense.value
         )
 
     def _resolve_weapon(
@@ -281,9 +301,11 @@ class Stats:
         equipment = actor.equipment
         main = equipment.slots.get(EquipmentTypes.MAIN_HAND)
         off = equipment.slots.get(EquipmentTypes.OFF_HAND)
+        if off is not None and isinstance(off.equippable, ArmorEquippable):
+            off = None
         if main is None and off is None:
             return [unarmed_weapon]
-        if not equipment.is_dual_wielding or not equipment.is_two_handing:
+        if not equipment.is_dual_wielding and not equipment.is_two_handing:
             if main is not None:
                 return [main.equippable]
             return [off.equippable]
@@ -307,7 +329,7 @@ class Stats:
         actor = self.parent.parent
         item = actor.equipment.slots.get(slot)
 
-        if item is not None:
+        if item is not None and isinstance(item.equippable, ArmorEquippable):
             item_defense = item.equippable.get_defense(actor)
             if item_defense is not None:
                 return item_defense
@@ -400,8 +422,8 @@ class Stats:
         return hp
 
     def _create_energy(self) -> Resource:
-        # base energy is 10 + 25% str, 25% dex, 50% con
-        energy = Resource(base_value=10, name=StatTypes.ENERGY.value)
+        # base energy is 0 + 25% str, 25% dex, 50% con
+        energy = Resource(base_value=0, name=StatTypes.ENERGY.value)
 
         _energy_str = CharacterStat(base_value=self.strength, name="BASE")
         _energy_str.add_modifier(
@@ -432,8 +454,8 @@ class Stats:
         return energy
 
     def _create_mana(self) -> Resource:
-        # base mana is 10 + 250% intelligence
-        mana = Resource(base_value=10, name=StatTypes.MANA.value)
+        # base mana is 0 + 250% intelligence
+        mana = Resource(base_value=0, name=StatTypes.MANA.value)
 
         _mana_int = CharacterStat(base_value=self.intelligence, name="BASE")
         _mana_int.add_modifier(
@@ -470,9 +492,7 @@ class Stats:
         # encumbrance (maximum weight of equipped items) is 50% of carrying capacity
         encumbrance = Resource(base_value=0, name=StatTypes.ENCUMBRANCE.value)
 
-        _enc_cc = CharacterStat(
-            base_value=self.carrying_capacity.max.value, name="BASE"
-        )
+        _enc_cc = CharacterStat(base_value=self.carrying_capacity.max, name="BASE")
         _enc_cc.add_modifier(
             StatModifier(value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE")
         )

@@ -43,13 +43,16 @@ def load_default_armor_args(armor: ArmorTypes) -> Dict:
 
     base_weight = data.get("base_weight")
 
-    bonuses = {
-        StatTypes.GLOBAL_SPEED: StatModifier(
-            value=1 - data.get("speed_penalty"),
-            mod_type=StatModType.PERCENT_MULT,
-            source="SELF",
-        )
-    }
+    if data.get("speed_penalty") is not None:
+        bonuses = {
+            StatTypes.GLOBAL_SPEED: StatModifier(
+                value=1 - data.get("speed_penalty"),
+                mod_type=StatModType.PERCENT_MULT,
+                source="SELF",
+            )
+        }
+    else:
+        bonuses = {}
 
     final_dict = {
         "base_weight": base_weight,

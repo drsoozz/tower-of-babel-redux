@@ -140,6 +140,10 @@ WEAPONS: dict[WeaponTypes, WeaponDefinition] = {
         path=DEFAULT_WEAPON_PATH / "rapier.json",
         tags={WeaponTags.SWORD, WeaponTags.ONE_HANDED},
     ),
+    WeaponTypes.SCIMITAR: WeaponDefinition(
+        path=DEFAULT_WEAPON_PATH / "scimitar.json",
+        tags={WeaponTags.SWORD, WeaponTags.ONE_HANDED},
+    ),
     WeaponTypes.SCYTHE: WeaponDefinition(
         path=DEFAULT_WEAPON_PATH / "scythe.json",
         tags={WeaponTags.SCYTHE, WeaponTags.TWO_HANDED},

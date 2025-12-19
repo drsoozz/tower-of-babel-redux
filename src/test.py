@@ -13,4 +13,10 @@ c: Item
 
 d = load_entity("goblin_warrior")
 d: Actor
-print(d.fighter.stats.attack)
+
+e = load_entity("kite_shield")
+e: Item
+
+f = load_entity("cloth_tunic")
+
+g = load_entity("scimitar")

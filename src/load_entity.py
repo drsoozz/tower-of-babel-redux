@@ -129,7 +129,8 @@ def load_weapon(data: Dict) -> Dict:
 
 
 def load_armor(data: Dict) -> Dict:
-    base = data.get("base_armor", None)
+    equippable_data = data.get("equippable")
+    base = equippable_data.get("base_armor", None)
     if base is not None:
         base = ArmorTypes.enum_from_string(base)
         base = load_default_armor_args(base)
@@ -137,7 +138,7 @@ def load_armor(data: Dict) -> Dict:
     base_bonuses = base.get("equippable_args", {}).get(
         "bonuses", {}
     )  # just global speed stuff (from the base's json)
-    bonuses_data = data.get("bonuses", {})  # stuff from the actual item json
+    bonuses_data = equippable_data.get("bonuses", {})  # stuff from the actual item json
 
     bonuses: Dict = base_bonuses
     if bonuses_data is not None:
@@ -167,7 +168,8 @@ def load_armor(data: Dict) -> Dict:
             else:
                 bonuses[stat_type] = stat_modifier
 
-    slots = data.get("slots")
+    slots = equippable_data.get("slots")
+    slots = EquipmentTypes.enum_from_string(slots)
     base["equippable_args"]["bonuses"] = bonuses
     base_weight = base.get("base_weight", None)
 
@@ -184,6 +186,8 @@ def load_armor(data: Dict) -> Dict:
                 weight = base_weight * consts.LEGS_WEIGHT_MODIFIER
             case EquipmentTypes.FEET:
                 weight = base_weight * consts.FEET_WEIGHT_MODIFIER
+            case EquipmentTypes.OFF_HAND:
+                weight = base_weight
             case _:
                 print("!?!?!")
 

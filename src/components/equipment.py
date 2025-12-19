@@ -103,7 +103,7 @@ class Equipment(BaseComponent):
         off_slots = self.occupied_slots(off)
 
         return main_slots == (EquipmentTypes.MAIN_HAND,) and off_slots == (
-            EquipmentTypes.OFF_HAND,
+            EquipmentTypes.MAIN_HAND,
         )
 
     def item_is_equipped(self, item: Item) -> bool:
@@ -131,9 +131,16 @@ class Equipment(BaseComponent):
     def equip_message(self, item_name: str, slots: Tuple[EquipmentTypes]) -> None:
         """Send a message to the player indicating an item was equipped."""
         if len(slots) > 1:
+            slots_message = ""
+            for slot in slots:
+                if slot == slots[-1]:
+                    slots_message += f"{slot.value}"
+                    continue
+                slots_message += f"{slot.value} and "
             self.parent.gamemap.engine.message_log.add_message(
-                f"You equip the {item_name} to the {[slot.value for slot in slots]} slots."
+                f"You equip the {item_name} to the {slots_message} slots."
             )
+            return
         self.parent.gamemap.engine.message_log.add_message(
             f"You equip the {item_name} to the {slots[0].value} slot."
         )
@@ -281,10 +288,6 @@ class Equipment(BaseComponent):
             > self.parent.fighter.stats.encumbrance.max_value
         ):
             # equipment fails
-
-            print(self.parent.fighter.stats.encumbrance.value)
-            print(equippable_item.weight)
-            print(self.parent.fighter.stats.encumbrance.max_value)
 
             self.too_heavy_message(equippable_item.name)
             return

@@ -48,6 +48,9 @@ class Entity:
         self.char = char
         self.color = color
         self.name = name
+
+        # player name, to be set with an inquiry
+        self.personal_name = self.name
         self.blocks_movement = blocks_movement
         self.render_order = render_order
         if parent:

@@ -19,11 +19,17 @@ class ArmorTypes(str, BaseEnum):
     HEAVY = "heavy"
     ULTRAHEAVY = "ultraheavy"
 
+    BUCKLER = "buckler"
+    KITE_SHIELD = "kite shield"
+    HEATER_SHIELD = "heater shield"
+    TOWER_SHIELD = "tower shield"
+
 
 class ArmorTags(str, BaseEnum):
     UNARMORED = "unarmored"
     LIGHTWEIGHT = "lightweight"
     HEAVYWEIGHT = "heavyweight"
+    SHIELD = "shield"
 
 
 @dataclass(frozen=True)
@@ -55,5 +61,21 @@ ARMORS: dict[ArmorTypes, ArmorDefinition] = {
     ),
     ArmorTypes.ULTRAHEAVY: ArmorDefinition(
         path=DEFAULT_ARMOR_PATH / "ultraheavy.json", tags=ArmorTags.HEAVYWEIGHT
+    ),
+    ArmorTypes.BUCKLER: ArmorDefinition(
+        path=DEFAULT_ARMOR_PATH / "buckler.json",
+        tags={ArmorTags.LIGHTWEIGHT, ArmorTags.SHIELD},
+    ),
+    ArmorTypes.KITE_SHIELD: ArmorDefinition(
+        path=DEFAULT_ARMOR_PATH / "kite_shield.json",
+        tags={ArmorTags.LIGHTWEIGHT, ArmorTags.SHIELD},
+    ),
+    ArmorTypes.HEATER_SHIELD: ArmorDefinition(
+        path=DEFAULT_ARMOR_PATH / "heater_shield.json",
+        tags={ArmorTags.HEAVYWEIGHT, ArmorTags.SHIELD},
+    ),
+    ArmorTypes.TOWER_SHIELD: ArmorDefinition(
+        path=DEFAULT_ARMOR_PATH / "tower_shield.json",
+        tags={ArmorTags.HEAVYWEIGHT, ArmorTags.SHIELD},
     ),
 }

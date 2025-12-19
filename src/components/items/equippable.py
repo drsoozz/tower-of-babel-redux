@@ -178,6 +178,7 @@ class ArmorEquippable(Equippable):
         EquipmentTypes.TORSO,
         EquipmentTypes.LEGS,
         EquipmentTypes.FEET,
+        EquipmentTypes.OFF_HAND,
     ]
 
     def __init__(

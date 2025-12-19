@@ -29,6 +29,12 @@ DEFAULT_DEFENSE_DICT = {
     )
 }
 
+DEFAULT_SHIELD_DICT = {
+    StatTypes.DEXTERITY: StatModifier(
+        value=0, mod_type=StatModType.PERCENT_MULT, source="BASE"
+    )
+}
+
 # unarmed strike
 DEFAULT_UNARMED_ATTACK_DICT = {
     StatTypes.STRENGTH: StatModifier(
@@ -67,7 +73,7 @@ SOUL_COIN_REWARD_LEVEL_EXPONENT = 1.43713005
 SOUL_COIN_REWARD_VARIANCE = 0.25
 
 ESSENCE_RARITY_TABLE = {
-    RarityTypes.COMMON: 1 / 2,
+    RarityTypes.COMMON: 1 / 320,
     RarityTypes.UNCOMMON: 1 / 160,
     RarityTypes.RARE: 1 / 80,
     RarityTypes.VERY_RARE: 1 / 40,
@@ -76,7 +82,7 @@ ESSENCE_RARITY_TABLE = {
 }
 
 ITEM_RARITY_TABLE = {
-    RarityTypes.COMMON: 1 / 2,
+    RarityTypes.COMMON: 1 / 100,
     RarityTypes.UNCOMMON: 1 / 50,
     RarityTypes.RARE: 1 / 25,
     RarityTypes.VERY_RARE: 1 / 12,

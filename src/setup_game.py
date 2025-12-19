@@ -43,7 +43,7 @@ def new_game() -> Engine:
     engine.update_fov()
 
     engine.message_log.add_message(
-        "Hello and welcome, adventurer, to yet another dungeon!", color.welcome_text.rgb
+        "Hello and welcome, adventurer, to yet another dungeon!", color.welcome_text
     )
 
     """
@@ -52,6 +52,21 @@ def new_game() -> Engine:
     player.inventory.items.append(greathammer)
     player.equipment.toggle_equip(greathammer, add_message=False)
     """
+
+    from load_entity import load_entity
+
+    kite_shield = load_entity("kite_shield")
+    kite_shield.parent = player.inventory
+    player.inventory.items.append(kite_shield)
+    scimitar = load_entity("scimitar")
+    scimitar.parent = player.inventory
+    player.inventory.items.append(scimitar)
+    greathammer = load_entity("greathammer")
+    greathammer.parent = player.inventory
+    player.inventory.items.append(greathammer)
+    goblin_shiv = load_entity("goblin_shiv")
+    goblin_shiv.parent = player.inventory
+    player.inventory.items.append(goblin_shiv)
 
     return engine
 
@@ -78,14 +93,14 @@ class MainMenu(input_handlers.BaseEventHandler):
             console.width // 2,
             console.height // 2 - 4,
             "TOWER OF BABEL",
-            fg=color.menu_title.rgb,
+            fg=color.menu_title,
             alignment=tcod.libtcodpy.CENTER,
         )
         console.print(
             console.width // 2,
             console.height - 2,
             "By drsooz",
-            fg=color.menu_title.rgb,
+            fg=color.menu_title,
             alignment=tcod.libtcodpy.CENTER,
         )
 
@@ -97,8 +112,8 @@ class MainMenu(input_handlers.BaseEventHandler):
                 console.width // 2,
                 console.height // 2 - 2 + i,
                 text.ljust(menu_width),
-                fg=color.menu_text.rgb,
-                bg=color.black.rgb,
+                fg=color.menu_text,
+                bg=color.black,
                 alignment=tcod.libtcodpy.CENTER,
                 bg_blend=tcod.libtcodpy.BKGND_ALPHA(64),
             )

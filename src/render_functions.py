@@ -47,20 +47,18 @@ def render_bar(
 
     bar_width = int(current_value / maximum_value * total_width)
 
-    console.draw_rect(
-        x=bar_x, y=bar_y, width=total_width, height=1, ch=1, bg=bar_empty.rgb
-    )
+    console.draw_rect(x=bar_x, y=bar_y, width=total_width, height=1, ch=1, bg=bar_empty)
 
     if bar_width > 0:
         console.draw_rect(
-            x=bar_x, y=bar_y, width=bar_width, height=1, ch=1, bg=bar_filled.rgb
+            x=bar_x, y=bar_y, width=bar_width, height=1, ch=1, bg=bar_filled
         )
 
     console.print(
         x=bar_text_x,
         y=bar_text_y,
         text=f"{round_for_display(current_value)}/{round_for_display(maximum_value)}",
-        fg=bar_text.rgb,
+        fg=bar_text,
     )
 
 
@@ -82,6 +80,35 @@ def render_names_at_mouse_location(
     )
 
     console.print(x=x, y=y, text=names_at_mouse_location)
+
+
+def render_tabs(
+    *,
+    console,
+    x: int,
+    y: int,
+    tabs: list[str],
+    selected_index: int,
+    selected_fg,
+    selected_bg,
+    unselected_fg,
+    spacer: str = "  ",
+    marker: bool = True,
+) -> None:
+    cursor_x = x
+
+    for i, tab in enumerate(tabs):
+        if i == selected_index:
+            text = f"► {tab} ◄" if marker else tab
+            fg = selected_fg
+            bg = selected_bg
+        else:
+            text = tab
+            fg = unselected_fg
+            bg = None
+
+        console.print(cursor_x, y, text, fg=fg, bg=bg)
+        cursor_x += len(text) + len(spacer)
 
 
 def round_for_display(x: float, sig: int = 3) -> float:

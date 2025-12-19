@@ -81,10 +81,10 @@ class Fighter(BaseComponent):
     def die(self) -> None:
         if self.engine.player is self.parent:
             death_message = "You died!"
-            death_message_color = color.player_die.rgb
+            death_message_color = color.player_die
         else:
             death_message = f"{self.parent.name} is dead!"
-            death_message_color = color.enemy_die.rgb
+            death_message_color = color.enemy_die
 
         self.parent.char = "%"
         self.parent.color = (191, 0, 0)

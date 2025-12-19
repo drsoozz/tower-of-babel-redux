@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from typing import Callable, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Callable, Optional, Tuple, TYPE_CHECKING, Union, Dict, List
 
 import tcod
 
@@ -10,13 +10,20 @@ import actions
 from actions import Action, BumpAction, PickupAction, WaitAction
 import color
 import consts
+import menu_text
+from menu_text import StatDescriptor, StatRow
 import exceptions
 from components.stats.stat_types import StatTypes
 from render_functions import round_for_display
+import render_functions
+
+from components.stats.resource import Resource
+
 
 if TYPE_CHECKING:
     from engine import Engine
     from entity import Item
+    from components.stats.character_stat import CharacterStat
 MOVE_KEYS = {
     # Arrow keys.
     tcod.event.KeySym.UP: (0, -1),
@@ -122,8 +129,8 @@ class PopupMessage(BaseEventHandler):
             console.width // 2,
             console.height // 2,
             self.text,
-            fg=color.white.rgb,
-            bg=color.black.rgb,
+            fg=color.white,
+            bg=color.black,
             alignment=tcod.CENTER,
         )
 
@@ -145,8 +152,8 @@ class AreYouSureToDeleteSave(PopupMessage):
             console.width // 2,
             console.height // 2 - 4,
             "Are you sure you want to delete your save?",
-            fg=color.white.rgb,
-            bg=color.black.rgb,
+            fg=color.white,
+            bg=color.black,
             alignment=tcod.libtcodpy.CENTER,
         )
 
@@ -156,8 +163,8 @@ class AreYouSureToDeleteSave(PopupMessage):
                 console.width // 2,
                 console.height // 2 - 2 + i,
                 text.ljust(menu_width),
-                fg=color.menu_text.rgb,
-                bg=color.black.rgb,
+                fg=color.menu_text,
+                bg=color.black,
                 alignment=tcod.libtcodpy.CENTER,
                 bg_blend=tcod.libtcodpy.BKGND_ALPHA(64),
             )
@@ -209,7 +216,7 @@ class EventHandler(BaseEventHandler):
         try:
             action.perform()
         except exceptions.Impossible as exc:
-            self.engine.message_log.add_message(exc.args[0], color.impossible.rgb)
+            self.engine.message_log.add_message(exc.args[0], color.impossible)
             return False  # Skip enemy turn on exceptions.
         for _ in self.engine.handle_enemy_turns():
             self.engine.update_fov()
@@ -265,16 +272,10 @@ class AskUserEventHandler(EventHandler):
 
     def _handle_key(self, event: tcod.event.KeyDown) -> Optional[ActionOrHandler]:
         """By default any key exits this input handler."""
-        if event.sym in {  # Ignore modifier keys.
-            tcod.event.KeySym.LSHIFT,
-            tcod.event.KeySym.RSHIFT,
-            tcod.event.KeySym.LCTRL,
-            tcod.event.KeySym.RCTRL,
-            tcod.event.KeySym.LALT,
-            tcod.event.KeySym.RALT,
-        }:
-            return None
-        return self.on_exit()
+        key = event.sym
+        if key == tcod.event.KeySym.ESCAPE:
+            return self.on_exit()
+        return None
 
     def on_exit(self) -> Optional[ActionOrHandler]:
         """Called when the user is trying to exit or cancel an action.
@@ -321,8 +322,8 @@ class EscapeMenuEventHandler(AskUserEventHandler):
                 console.width // 2,
                 console.height // 2 - 2 + i,
                 text.ljust(self.menu_width),
-                fg=color.menu_text.rgb,
-                bg=color.black.rgb,
+                fg=color.menu_text,
+                bg=color.black,
                 alignment=tcod.libtcodpy.CENTER,
                 bg_blend=tcod.libtcodpy.BKGND_ALPHA(64),
             )
@@ -530,6 +531,326 @@ class QueryRestLoopHandler(AskUserEventHandler):
         return super()._handle_key(event)
 
 
+class CharacterStatsHandler(AskUserEventHandler):
+    TITLE = "CHARACTER INFORMATION"
+
+    TABS_NAMES = ["INVENTORY [I]", "STATS [O]", "ESSENCES [J]", "SKILLS [K]"]
+    SELECTED_TAB = 1
+    TABS_SPACER = "  "
+    TABS = TABS_NAMES[0] + TABS_SPACER + TABS_NAMES[1] + TABS_SPACER + TABS_NAMES[2]
+    SUBTABS = ["BASE", "DAMAGE", "COMBAT"]
+    SELECTED_SUBTAB = 0
+    SUBTAB_SPACER = "  "
+    PALETTE = color.menu_stats_palette
+    SELECTED_STAT_INDEX = None
+    BASE_STATS_DESCRIPTIONS = menu_text.BASE_STAT_DESCRIPTIONS
+
+    def __init__(self, engine):
+        super().__init__(
+            engine,
+            frame_width=None,
+            frame_height=None,
+            title=self.TITLE,
+            question=None,
+        )
+
+        self.x = 2
+        self.y = 2
+        self.frame_width = consts.SCREEN_WIDTH - 4
+        self.frame_height = consts.SCREEN_HEIGHT - 4
+        self.title_x = self.x + 2
+        self.title_y = self.y + 2
+        self.tabs_x = self.x + 2
+        self.tabs_y = self.title_y + 1
+
+        self.subtabs_x = self.tabs_x
+        self.subtabs_y = self.tabs_y + 4
+
+        self.text_x = self.x + 2
+        self.text_y = self.subtabs_y + 3
+        self.menu_width = 24
+
+    def move_stat_cursor(self, delta: int) -> None:
+        n = len(self.BASE_STATS_DESCRIPTIONS)
+        if self.SELECTED_STAT_INDEX is None:
+            self.SELECTED_STAT_INDEX = 0 if delta > 0 else n - 1
+        else:
+            self.SELECTED_STAT_INDEX = (self.SELECTED_STAT_INDEX + delta) % n
+
+    def move_tab_cursor(self, delta: int) -> None:
+        n = len(self.TABS_NAMES)
+        self.SELECTED_TAB = (self.SELECTED_TAB + delta) % n
+
+    def move_subtab_cursor(self, delta: int) -> None:
+        n = len(self.SUBTABS)
+        self.SELECTED_SUBTAB = (self.SELECTED_SUBTAB + delta) % n
+
+    def render_base_stats(self, console: tcod.console.Console) -> None:
+        x = self.text_x
+        y = self.text_y + 1
+
+        console.print(x=x, y=y, text=f"NAME: {self.engine.player.personal_name}")
+        y += 2
+        console.print(x=x, y=y, text=f"LEVEL: {self.engine.player.level.current_level}")
+        y += 4
+
+        base_attributes = self.gather_base_attributes()
+
+        console.print(
+            x=x,
+            y=y,
+            text="ATTRIBUTES",
+            fg=color.white,
+            bg=self.PALETTE.pitch,
+        )
+        y += 2
+        for text in base_attributes:
+            text_abbrev = text[0][:3]
+            text_rest = text[0][3:]
+            val = text[1]
+            console.print(x=x + 2, y=y, text=text_abbrev, fg=color.white)
+            console.print(
+                x=x + 2 + len(text_abbrev),
+                y=y,
+                text=text_rest,
+                fg=self.PALETTE.mid_light,
+            )
+            console.print(x=x + 2 + len(text[0]), y=y, text=val, fg=self.PALETTE.light)
+            y += 2
+
+        y += 4
+        resources = self.gather_resources()
+
+        console.print(
+            x=x,
+            y=y,
+            text="RESOURCES",
+            fg=color.white,
+            bg=self.PALETTE.pitch,
+        )
+        y += 2
+        for text in resources:
+            console.print(x=x + 2, y=y, text=text[0], fg=color.white)
+            console.print(
+                x=x + 2 + len(text[0]), y=y, text=text[1], fg=self.PALETTE.light
+            )
+            y += 2
+
+    def render_damage_stats(self, console: tcod.console.Console) -> None:
+        pass
+
+    def render_combat_stats(self, console: tcod.console.Console) -> None:
+        pass
+
+    def gather_base_attributes(self) -> List[Tuple[str, str]]:
+        """
+        Gather player base attributes for UI display.
+
+        Each entry is returned as a (label, value) tuple, where `label`
+        always ends with ': ' and `value` contains the formatted stat text.
+        """
+        stats = self.engine.player.fighter.stats
+        rows: List[Tuple[str, str]] = []
+
+        base_attributes = [
+            StatTypes.STRENGTH,
+            StatTypes.DEXTERITY,
+            StatTypes.CONSTITUTION,
+            StatTypes.INTELLIGENCE,
+            StatTypes.CUNNING,
+            StatTypes.WILLPOWER,
+        ]
+
+        for stat_type in base_attributes:
+            label = f"{stat_type.value.upper()}: "
+            value = str(round_for_display(stats.get_stat(stat_type).value))
+            rows.append((label, value))
+
+        return self.pad_stat_rows(rows)
+
+    def gather_resources(self) -> List[Tuple[str, str]]:
+        """
+        Gather player resource and regen stats for UI display.
+
+        Each entry is returned as a (label, value) tuple, where `label`
+        always ends with ': ' and `value` contains the formatted stat text.
+        Empty rows are represented as ('', '').
+        """
+        stats = self.engine.player.fighter.stats
+        rows: List[Tuple[str, str]] = []
+
+        resource_order = [
+            StatTypes.HP,
+            StatTypes.HP_REGEN,
+            None,
+            StatTypes.ENERGY,
+            StatTypes.ENERGY_REGEN,
+            None,
+            StatTypes.MANA,
+            StatTypes.MANA_REGEN,
+            None,
+            StatTypes.CARRYING_CAPACITY,
+            StatTypes.ENCUMBRANCE,
+        ]
+
+        for stat_type in resource_order:
+            if stat_type is None:
+                rows.append(("", ""))
+                continue
+
+            label = (
+                f"{stat_type.value.upper()}: "
+                if stat_type is not StatTypes.CARRYING_CAPACITY
+                else "CARRYING CAP.: "
+            )
+            stat = getattr(stats, stat_type.normalized)
+
+            # Resource-style stats (current / max)
+            if isinstance(stat, Resource):
+                current = round_for_display(stat.value)
+                maximum = round_for_display(stat.max_value)
+
+                if stat_type in {
+                    StatTypes.CARRYING_CAPACITY,
+                    StatTypes.ENCUMBRANCE,
+                }:
+                    value = f"{current}/{maximum} lbs"
+                else:
+                    value = f"{current}/{maximum}"
+
+            # Regen-style stats (value / 100 initiative)
+            else:
+                value = f"{round_for_display(stat.value)}/100 INITIATIVE"
+
+            rows.append((label, value))
+
+        return self.pad_stat_rows(rows)
+
+    def pad_stat_rows(
+        self,
+        rows: Tuple[str, str] | List[Tuple[str, str]],
+    ) -> Tuple[str, str] | List[Tuple[str, str]]:
+        """
+        Pad stat row labels so all values align in the same column.
+
+        Accepts either a single (label, value) tuple or a list of them.
+        Empty rows ('', '') are preserved and ignored for width calculation.
+        """
+        # Normalize to list
+        is_single = isinstance(rows, tuple)
+        row_list: List[Tuple[str, str]] = [rows] if is_single else list(rows)
+
+        # Compute max label width (ignore empty labels)
+        max_label_width = max(
+            (len(label) for label, _ in row_list if label),
+            default=0,
+        )
+
+        padded = [
+            (label.ljust(max_label_width), value) if label else ("", "")
+            for label, value in row_list
+        ]
+
+        return padded[0] if is_single else padded
+
+    def on_render(self, console):
+        super().on_render(console)
+        console.draw_frame(
+            x=self.x,
+            y=self.y,
+            width=self.frame_width,
+            height=self.frame_height,
+            clear=True,
+            fg=self.PALETTE.light,
+            bg=self.PALETTE.dark,
+        )
+
+        console.print(self.title_x, self.y, self.TITLE)
+
+        # top-level tabs
+        render_functions.render_tabs(
+            console=console,
+            x=self.tabs_x,
+            y=self.tabs_y,
+            tabs=self.TABS_NAMES,
+            selected_index=self.SELECTED_TAB,
+            selected_fg=self.PALETTE.light,
+            selected_bg=self.PALETTE.mid,
+            unselected_fg=self.PALETTE.unselected,
+        )
+
+        console.print(
+            x=self.x + 2,
+            y=self.tabs_y + 2,
+            text="─" * (self.frame_width - 4),
+            fg=self.PALETTE.mid_light,
+        )
+
+        # subtabs
+        render_functions.render_tabs(
+            console=console,
+            x=self.subtabs_x,
+            y=self.subtabs_y,
+            tabs=self.SUBTABS,
+            selected_index=self.SELECTED_SUBTAB,
+            selected_fg=self.PALETTE.light,
+            selected_bg=self.PALETTE.mid,
+            unselected_fg=self.PALETTE.unselected,
+        )
+
+        console.print(
+            x=self.x + 3,
+            y=self.subtabs_y + 2,
+            text="─" * (self.frame_width - 6),
+            fg=self.PALETTE.mid,
+        )
+
+        match self.SELECTED_SUBTAB:
+            case 0:
+                self.render_base_stats(console)
+            case 1:
+                self.render_damage_stats(console)
+            case 2:
+                self.render_combat_stats(console)
+
+        for i in range(self.frame_height - 13):
+            console.print(
+                x=(self.frame_width + self.x) // 2,
+                y=self.text_y + i,
+                text="║",
+                fg=self.PALETTE.mid_dark,
+            )
+
+        console.print(
+            x=self.x + 3,
+            y=self.frame_height - 1,
+            text="─" * (self.frame_width - 6),
+            fg=self.PALETTE.mid,
+        )
+
+    def _handle_key(self, event):
+        key = event.sym
+        modifier = event.mod
+
+        if key == tcod.event.KeySym.LEFT and modifier & (
+            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
+        ):
+            self.move_tab_cursor(-1)
+        elif key == tcod.event.KeySym.RIGHT and modifier & (
+            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
+        ):
+            self.move_tab_cursor(1)
+        elif key == tcod.event.KeySym.LEFT:
+            self.move_subtab_cursor(-1)
+        elif key == tcod.event.KeySym.RIGHT:
+            self.move_subtab_cursor(1)
+        elif key == tcod.event.KeySym.UP:
+            self.move_stat_cursor(-1)
+        elif key == tcod.event.KeySym.DOWN:
+            self.move_stat_cursor(1)
+        return super()._handle_key(event)
+
+
 class LevelUpEventHandler(AskUserEventHandler):
 
     def __init__(self, engine):
@@ -610,7 +931,7 @@ class LevelUpEventHandler(AskUserEventHandler):
             player.level.increase_stat(StatTypes.WILLPOWER)
         else:
             return None
-        return super()._handle_key(event)
+        return MainGameEventHandler(self.engine)
 
 
 class InventoryEventHandler(AskUserEventHandler):
@@ -679,7 +1000,7 @@ class InventoryEventHandler(AskUserEventHandler):
             try:
                 selected_item = player.inventory.items[index]
             except IndexError:
-                self.engine.message_log.add_message("Invalid entry.", color.invalid.rgb)
+                self.engine.message_log.add_message("Invalid entry.", color.invalid)
                 return None
             return self.on_item_selected(selected_item)
         return super()._handle_key(event)
@@ -734,8 +1055,8 @@ class SelectIndexHandler(AskUserEventHandler):
         """Highlight the tile under the cursor."""
         super().on_render(console)
         x, y = self.engine.mouse_location
-        console.rgb["bg"][x, y] = color.white.rgb
-        console.rgb["fg"][x, y] = color.black.rgb
+        console.rgb["bg"][x, y] = color.white
+        console.rgb["fg"][x, y] = color.black
 
     def _handle_key(self, event: tcod.event.KeyDown) -> Optional[ActionOrHandler]:
         """Check for key movement or confirmation keys."""
@@ -815,7 +1136,7 @@ class AreaRangedAttackHandler(SelectIndexHandler):
             y=y - self.radius - 1,
             width=self.radius**2,
             height=self.radius**2,
-            fg=color.red.rgb,
+            fg=color.red,
             clear=False,
         )
 
@@ -864,6 +1185,8 @@ class MainGameEventHandler(EventHandler):
             return LookHandler(self.engine)
         elif key == tcod.event.KeySym.TAB:
             return CharacterScreenEventHandler(self.engine)
+        elif key == tcod.event.KeySym.O:
+            return CharacterStatsHandler(self.engine)
         return action
 
 

@@ -46,7 +46,7 @@ class ConfusionConsumable(Consumable):
 
     def get_action(self, consumer: Actor) -> SingleRangedAttackHandler:
         self.engine.message_log.add_message(
-            "Select a target location.", color.needs_target.rgb
+            "Select a target location.", color.needs_target
         )
         return SingleRangedAttackHandler(
             self.engine,
@@ -66,7 +66,7 @@ class ConfusionConsumable(Consumable):
 
         self.engine.message_log.add_message(
             f"The eyes of the {target.name} look vacant, as it starts to stumble around!",
-            color.status_effect_applied.rgb,
+            color.status_effect_applied,
         )
         target.ai = components.ai.ConfusedEnemy(
             entity=target,
@@ -87,7 +87,7 @@ class HealingPotion(Consumable):
         if amount_recovered > 0:
             self.engine.message_log.add_message(
                 f"You consume the {self.parent.name}, and recover {amount_recovered} HP!",
-                color.health_recovered.rgb,
+                color.health_recovered,
             )
             self.consume()
         else:
@@ -101,7 +101,7 @@ class FireballDamageConsumable(Consumable):
 
     def get_action(self, consumer: Actor) -> AreaRangedAttackHandler:
         self.engine.message_log.add_message(
-            "Select a target location.", color.needs_target.rgb
+            "Select a target location.", color.needs_target
         )
         return AreaRangedAttackHandler(
             self.engine,

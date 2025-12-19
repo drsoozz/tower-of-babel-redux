@@ -154,7 +154,7 @@ class TakeStairsAction(Action):
         if (self.entity.x, self.entity.y) == self.engine.game_map.upstairs_location:
             self.engine.game_world.generate_floor()
             self.engine.message_log.add_message(
-                "You ascend the staircase.", color.ascend.rgb
+                "You ascend the staircase.", color.ascend
             )
             self.apply_cost()
         else:

@@ -79,6 +79,4 @@ def load_default_weapon_args(weapon: WeaponTypes) -> Dict:
             "attack_init_cost": atttack_init_cost,
         },
     }
-    print(weapon)
-    print(final_dict)
     return final_dict
