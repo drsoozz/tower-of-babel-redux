@@ -215,17 +215,23 @@ class AttackAction(Action):
             attack_desc = f"{self.attacker.name.capitalize()} attacks {self.defender.name.capitalize()}."
             self.engine.message_log.add_message(attack_desc)
 
-            if roll < max(0.05, chance):
+            if roll < max(self.attacker.fighter.stats.critical_chance.value, chance):
+                multiplier = 1.0
+                if roll < self.attacker.fighter.stats.critical_chance.value:
+                    self.engine.message_log.add_message("The attack is a critical hit!")
+                    multiplier = self.attacker.fighter.stats.critical_multiplier.value
+
                 # final damage of attack
                 final_damage = damage.calculate_final_damage(
                     attacker=self.attacker, defender=self.defender
                 )
 
-                summed_damage = final_damage.totalled_damage
+                summed_damage = final_damage.totalled_damage * multiplier
 
                 if summed_damage > 0:
                     for damtype, damval in final_damage.values.items():
                         damtype: DamageTypes
+                        damval *= multiplier
                         if damval > 0:
                             self.engine.message_log.add_message(
                                 f"The attack does {round_for_display(damval)} {damtype.value.upper()} damage."

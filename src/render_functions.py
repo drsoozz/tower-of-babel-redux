@@ -115,3 +115,98 @@ def round_for_display(x: float, sig: int = 3) -> float:
     if x == 0:
         return 0
     return round(x, sig - int(math.floor(math.log10(abs(x)))) - 1)
+
+
+def render_character_information_screens(
+    console: Console,
+    palette: color.Palette,
+    x: int,
+    y: int,
+    frame_width: int,
+    frame_height: int,
+    title: str,
+    title_x: int,
+    tabs_x: int,
+    tabs_y: int,
+    selected_tab: int,
+    subtabs_x: int,
+    subtabs_y: int,
+    subtabs: list[str],
+    selected_subtab: int,
+    text_y: int,
+    vertical_split: bool = True,  # if false, make a horizontal split line in the middle of the screen, not a vertical one!
+    horizontal_split_y: int = None,  # only used if vertical_split is False
+) -> None:
+    TABS_NAMES = ["INVENTORY [I]", "STATS [O]", "ESSENCES [J]", "SKILLS [K]"]
+    console.draw_frame(
+        x=x,
+        y=y,
+        width=frame_width,
+        height=frame_height,
+        clear=True,
+        fg=palette.light,
+        bg=palette.dark,
+    )
+
+    console.print(title_x, y, title)
+
+    # top-level tabs
+    render_tabs(
+        console=console,
+        x=tabs_x,
+        y=tabs_y,
+        tabs=TABS_NAMES,
+        selected_index=selected_tab,
+        selected_fg=palette.white,
+        selected_bg=palette.mid,
+        unselected_fg=palette.unselected,
+    )
+
+    console.print(
+        x=x + 2,
+        y=tabs_y + 2,
+        text="─" * (frame_width - 4),
+        fg=palette.mid_light,
+    )
+
+    # subtabs
+    render_tabs(
+        console=console,
+        x=subtabs_x,
+        y=subtabs_y,
+        tabs=subtabs,
+        selected_index=selected_subtab,
+        selected_fg=palette.white,
+        selected_bg=palette.mid,
+        unselected_fg=palette.unselected,
+    )
+
+    console.print(
+        x=x + 3,
+        y=subtabs_y + 2,
+        text="─" * (frame_width - 6),
+        fg=palette.mid,
+    )
+
+    console.print(
+        x=x + 3,
+        y=frame_height - 1,
+        text="─" * (frame_width - 6),
+        fg=palette.mid,
+    )
+
+    if vertical_split:
+        for i in range(frame_height - 13):
+            console.print(
+                x=(frame_width + x) // 2,
+                y=text_y + i,
+                text="║",
+                fg=palette.mid_dark,
+            )
+    else:
+        console.print(
+            x=(x + 3),
+            y=horizontal_split_y,
+            text="─" * (frame_width - 6),
+            fg=palette.mid_dark,
+        )

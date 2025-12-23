@@ -58,9 +58,10 @@ class Fighter(BaseComponent):
     def init_hook(self) -> None:
         if self.parent.name == "Player":
             self.stats.hp.max.add_modifier(
-                StatModifier(value=5, mod_type=StatModType.FLAT, source="BASE")
+                StatModifier(value=0, mod_type=StatModType.FLAT, source="BASE")
             )
             self.stats.hp.maximize()
+            self.stats.initiative.initiative.maximize()
 
     @property
     def hp(self) -> int:

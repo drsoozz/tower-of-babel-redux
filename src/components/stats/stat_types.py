@@ -27,3 +27,5 @@ class StatTypes(str, BaseEnum):
     ATTACK_SPEED = "attack speed"
     MOVEMENT_SPEED = "movement speed"
     CASTING_SPEED = "casting speed"
+    CRITICAL_CHANCE = "critical chance"
+    CRITICAL_MULTIPLIER = "critical_multiplier"

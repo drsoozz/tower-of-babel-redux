@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, overload, Dict, Optional, Tuple, List
 from copy import deepcopy
 
 import consts
-from components.stats.character_stat import CharacterStat
+from components.stats.character_stat import CharacterStat, CappedStat
 from components.stats.stat_modifier import StatModifier
 from components.stats.stat_mod_types import StatModType
 from components.stats.resource import Resource
@@ -15,11 +15,10 @@ from components.stats.initiative import Initiative
 from components.stats.damage_stats import ResistStats, DamageAmpStats, MasteryStats
 from components.equipment_types import EquipmentTypes
 from components.items.equippable import ArmorEquippable, WeaponEquippable
+from components.stats.weapon_range import WeaponRange
 
 if TYPE_CHECKING:
     from components.fighter import Fighter
-    from components.stats.character_stat import CappedStat
-    from components.stats.weapon_range import WeaponRange
 
 _STAT_BUILD_TABLE = {
     StatTypes.HP: (
@@ -62,6 +61,16 @@ _STAT_BUILD_TABLE = {
         CharacterStat,
         "_create_mana_regen",
     ),
+    StatTypes.CRITICAL_CHANCE: (
+        StatTypes.CRITICAL_CHANCE.normalized,
+        CappedStat,
+        "_create_critical_chance",
+    ),
+    StatTypes.CRITICAL_MULTIPLIER: (
+        StatTypes.CRITICAL_MULTIPLIER.normalized,
+        CharacterStat,
+        "_create_critical_multiplier",
+    ),
 }
 
 
@@ -87,7 +96,7 @@ class Stats:
         natural_weapon_damage_dict: Optional[
             Dict[DamageTypes, Dict[StatTypes, StatModifier | List[StatModifier]]]
         ] = None,
-        natural_weapon_range: Optional[WeaponRange] = None,
+        natural_weapon_range: Optional[WeaponRange] = WeaponRange(None),
         natural_weapon_attack_init_cost: Optional[
             int
         ] = consts.DEFAULT_UNARMED_ATTACK_INIT_COST,
@@ -146,6 +155,8 @@ class Stats:
         self.hp_regen: CharacterStat
         self.energy_regen: CharacterStat
         self.mana_regen: CharacterStat
+        self.critical_chance: CappedStat
+        self.critical_multiplier: CharacterStat
         # actually making the stats
         for stat_type, (attr, ctor, factory_name) in _STAT_BUILD_TABLE.items():
             self._build_optional_stat(
@@ -241,15 +252,9 @@ class Stats:
             weapon = tuple(weapon)
         weapon: tuple[WeaponEquippable]
 
-        lowest_attack_range = WeaponRange(9999)
-        for wp in weapon:
-            weapon_range = wp.weapon_range
-            if weapon_range.max_range < lowest_attack_range.max_range:
-                lowest_attack_range = weapon_range
-
         attack_range: List[WeaponRange] = []
-        for _ in len(weapon):
-            attack_range.append(lowest_attack_range)
+        for wp in weapon:
+            attack_range.append(wp.weapon_range)
 
         return attack_range
 
@@ -492,13 +497,13 @@ class Stats:
         # encumbrance (maximum weight of equipped items) is 50% of carrying capacity
         encumbrance = Resource(base_value=0, name=StatTypes.ENCUMBRANCE.value)
 
-        _enc_cc = CharacterStat(base_value=self.carrying_capacity.max, name="BASE")
-        _enc_cc.add_modifier(
-            StatModifier(value=0.25, mod_type=StatModType.PERCENT_MULT, source="BASE")
+        _cc_str = CharacterStat(base_value=self.strength, name="BASE")
+        _cc_str.add_modifier(
+            StatModifier(value=2.5, mod_type=StatModType.PERCENT_MULT, source="BASE")
         )
 
         encumbrance.max.add_modifier(
-            StatModifier(value=_enc_cc, mod_type=StatModType.FLAT, source="BASE")
+            StatModifier(value=_cc_str, mod_type=StatModType.FLAT, source="BASE")
         )
 
         encumbrance.minimize()
@@ -593,6 +598,41 @@ class Stats:
         )
 
         return mana_regen
+
+    def _create_critical_chance(self) -> CappedStat:
+        # uses a lambda function but it has to be tied to the class so it can be saved with the engine
+        crit_chance = CappedStat(base_value=0, lower_cap=0, upper_cap=None, name="BASE")
+        _cun = CharacterStat(base_value=self.cunning, name="BASE")
+        _cun_scaling = StatModifier(
+            value=self._crit_scaling,
+            mod_type=StatModType.FUNC,
+            source="BASE",
+            depends_on=[_cun],
+        )
+
+        crit_chance.add_modifier(_cun_scaling)
+        return crit_chance
+
+    def _crit_scaling(self, cun: CharacterStat) -> float:
+        return max(0, 1 - 0.95 * pow(0.99, cun.value - 10))
+
+    def _create_critical_multiplier(self) -> CharacterStat:
+        # 1 + 2.5% int + 2.5% cun
+        crit_mult = CharacterStat(base_value=1, name="BASE")
+        _int = CharacterStat(base_value=self.intelligence, name="BASE")
+        _cun = CharacterStat(base_value=self.cunning, name="BASE")
+        weight = StatModifier(
+            value=0.025, mod_type=StatModType.PERCENT_MULT, source="BASE"
+        )
+        _int.add_modifier(weight)
+        _cun.add_modifier(weight)
+
+        int = StatModifier(value=_int, mod_type=StatModType.FLAT, source="BASE")
+        cun = StatModifier(value=_cun, mod_type=StatModType.FLAT, source="BASE")
+
+        crit_mult.add_modifier(int)
+        crit_mult.add_modifier(cun)
+        return crit_mult
 
     def _create_naked_defense(self) -> CharacterStat:
         naked_defense = CharacterStat(base_value=0, name="NAKED_DEFENSE")

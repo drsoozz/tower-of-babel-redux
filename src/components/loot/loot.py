@@ -35,6 +35,7 @@ class Loot(BaseComponent):
             if monster_item is None:
                 raise ValueError("No given monster item!")
 
+        self.is_player = is_player
         self.monster_tier = monster_tier
         self.monster_rarity = monster_rarity
         self.essence = monster_essence
@@ -84,6 +85,9 @@ class Loot(BaseComponent):
         wallet.add({Currency.SOUL_COIN: self.reward_money})
 
     def disperse_loot(self, killer: Actor) -> None:
+        if self.is_player:
+            return
+
         # 1. give reward money (guaranteed)
         self.grant_reward_money_to_killer(killer=killer)
 

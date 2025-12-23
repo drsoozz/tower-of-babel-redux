@@ -14,11 +14,13 @@ import menu_text
 from menu_text import StatDescriptor, StatRow
 import exceptions
 from components.stats.stat_types import StatTypes
+from components.stats.damage_types import DamageTypes
 from render_functions import round_for_display
 import render_functions
-
+from components.stats import combat_stat_types
 from components.stats.resource import Resource
-
+from components.equipment_types import EquipmentTypes
+from components.items.equippable import WeaponEquippable, ArmorEquippable
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -531,28 +533,31 @@ class QueryRestLoopHandler(AskUserEventHandler):
         return super()._handle_key(event)
 
 
-class CharacterStatsHandler(AskUserEventHandler):
+class CharacterInformationHandler(AskUserEventHandler):
     TITLE = "CHARACTER INFORMATION"
-
     TABS_NAMES = ["INVENTORY [I]", "STATS [O]", "ESSENCES [J]", "SKILLS [K]"]
-    SELECTED_TAB = 1
     TABS_SPACER = "  "
     TABS = TABS_NAMES[0] + TABS_SPACER + TABS_NAMES[1] + TABS_SPACER + TABS_NAMES[2]
-    SUBTABS = ["BASE", "DAMAGE", "COMBAT"]
-    SELECTED_SUBTAB = 0
-    SUBTAB_SPACER = "  "
-    PALETTE = color.menu_stats_palette
-    SELECTED_STAT_INDEX = None
-    BASE_STATS_DESCRIPTIONS = menu_text.BASE_STAT_DESCRIPTIONS
+    SELECTED_TAB: int
+    PALETTE: color.Palette
+    SUBTABS: List[str]
+    SELECTED_SUBTAB: int
 
-    def __init__(self, engine):
+    def __init__(
+        self,
+        engine,
+        selected_tab: int,
+        palette: color.Palette,
+        subtabs: list[str],
+        selected_subtab: int,
+    ):
         super().__init__(
-            engine,
-            frame_width=None,
-            frame_height=None,
-            title=self.TITLE,
-            question=None,
+            engine, frame_width=None, frame_height=None, title=self.TITLE, question=None
         )
+        self.SELECTED_TAB = selected_tab
+        self.PALETTE = palette
+        self.SUBTABS = subtabs
+        self.SELECTED_SUBTAB = selected_subtab
 
         self.x = 2
         self.y = 2
@@ -570,13 +575,6 @@ class CharacterStatsHandler(AskUserEventHandler):
         self.text_y = self.subtabs_y + 3
         self.menu_width = 24
 
-    def move_stat_cursor(self, delta: int) -> None:
-        n = len(self.BASE_STATS_DESCRIPTIONS)
-        if self.SELECTED_STAT_INDEX is None:
-            self.SELECTED_STAT_INDEX = 0 if delta > 0 else n - 1
-        else:
-            self.SELECTED_STAT_INDEX = (self.SELECTED_STAT_INDEX + delta) % n
-
     def move_tab_cursor(self, delta: int) -> None:
         n = len(self.TABS_NAMES)
         self.SELECTED_TAB = (self.SELECTED_TAB + delta) % n
@@ -585,62 +583,689 @@ class CharacterStatsHandler(AskUserEventHandler):
         n = len(self.SUBTABS)
         self.SELECTED_SUBTAB = (self.SELECTED_SUBTAB + delta) % n
 
+    def on_render(
+        self,
+        console,
+        vertical_split: bool = True,  # if false, make a horizontal split line in the middle of the screen, not a vertical one!
+        horizontal_split_y: int = None,
+    ):
+        super().on_render(console)
+        render_functions.render_character_information_screens(
+            console=console,
+            palette=self.PALETTE,
+            x=self.x,
+            y=self.y,
+            frame_width=self.frame_width,
+            frame_height=self.frame_height,
+            title=self.TITLE,
+            title_x=self.title_x,
+            tabs_x=self.tabs_x,
+            tabs_y=self.tabs_y,
+            selected_tab=self.SELECTED_TAB,
+            subtabs_x=self.subtabs_x,
+            subtabs_y=self.subtabs_y,
+            subtabs=self.SUBTABS,
+            selected_subtab=self.SELECTED_SUBTAB,
+            text_y=self.text_y,
+            vertical_split=vertical_split,
+            horizontal_split_y=horizontal_split_y,
+        )
+
+    def _handle_key(self, event):
+        return super()._handle_key(event)
+
+
+class CharacterStatsHandler(CharacterInformationHandler):
+    TITLE = "CHARACTER INFORMATION"
+
+    SUBTABS = ["BASE", "DAMAGE", "COMBAT"]
+    SELECTED_SUBTAB = 0
+    SUBTAB_SPACER = "  "
+    SELECTED_STAT_INDEX = None
+    BASE_STATS_DESCRIPTIONS = menu_text.BASE_STAT_DESCRIPTIONS
+    DAMAGE_STAT_DESCRIPTIONS = menu_text.DAMAGE_STAT_DESCRIPTIONS
+    COMBAT_STAT_DESCRIPTIONS = menu_text.COMBAT_TEXT_DESCRIPTIONS
+
+    def __init__(self, engine):
+        super().__init__(
+            engine,
+            selected_tab=1,
+            palette=color.menu_stats_palette,
+            subtabs=self.SUBTABS,
+            selected_subtab=self.SELECTED_SUBTAB,
+        )
+
+        self.base_stat_rows: list[StatRow] = []
+        self._build_base_stat_rows()
+        self.damage_stat_rows: list[StatRow] = []
+        self._build_damage_stat_rows()
+        self.combat_stat_rows: list[StatRow] = []
+        self._build_combat_stat_rows()
+
+        # self.combat_stat_rows: list[StatRow] = []
+        # self._build_combat_stat_rows()
+
+    def _build_base_stat_rows(self) -> None:
+        rows: list[StatRow] = []
+
+        # --- ATTRIBUTES HEADER ---
+        rows.append(StatRow(None, "ATTRIBUTES", "", selectable=False))
+
+        for stat_type, (label, value) in zip(
+            [
+                StatTypes.STRENGTH,
+                StatTypes.DEXTERITY,
+                StatTypes.CONSTITUTION,
+                StatTypes.INTELLIGENCE,
+                StatTypes.CUNNING,
+                StatTypes.WILLPOWER,
+            ],
+            self.gather_base_attributes(),
+        ):
+            rows.append(
+                StatRow(
+                    key=stat_type,
+                    label=label,
+                    value=value,
+                    selectable=True,
+                )
+            )
+
+        # spacer
+        rows.append(StatRow(None, "", "", selectable=False))
+
+        # --- RESOURCES HEADER ---
+        rows.append(StatRow(None, "RESOURCES", "", selectable=False))
+
+        resource_keys = [
+            StatTypes.HP,
+            StatTypes.HP_REGEN,
+            None,
+            StatTypes.ENERGY,
+            StatTypes.ENERGY_REGEN,
+            None,
+            StatTypes.MANA,
+            StatTypes.MANA_REGEN,
+            None,
+            StatTypes.CARRYING_CAPACITY,
+            StatTypes.ENCUMBRANCE,
+        ]
+
+        for key, (label, value) in zip(resource_keys, self.gather_resources()):
+            if key is None:
+                rows.append(StatRow(None, "", "", selectable=False))
+            else:
+                rows.append(
+                    StatRow(
+                        key=key,
+                        label=label,
+                        value=value,
+                        selectable=True,
+                    )
+                )
+
+        self.base_stat_rows = rows
+
+    def _build_damage_stat_rows(self) -> None:
+        # damage stat rows are: (see the following variables)
+
+        rows: list[StatRow] = []
+
+        # spacer
+        rows.append(StatRow(None, "", "", selectable=False))
+
+        for stat_type, (label, value) in zip(
+            [
+                StatTypes.DAMAGE_RESISTS,
+                StatTypes.DAMAGE_AMPS,
+                StatTypes.DAMAGE_MASTERIES,
+            ],
+            self.gather_damage_stats(),
+        ):
+            rows.append(
+                StatRow(key=stat_type, label=label, value=value, selectable=True)
+            )
+            # spacer
+            rows.append(StatRow(None, "", "", selectable=False))
+            rows.append(StatRow(None, "", "", selectable=False))
+
+        self.damage_stat_rows = rows
+
+    def _build_combat_stat_rows(self) -> None:
+        rows: list[StatRow] = []
+
+        # --- WEAPONS ---
+        weapon_stat_types = combat_stat_types.WeaponStatTypes
+
+        for stat_type, (label, value) in zip(
+            list(weapon_stat_types), self.gather_weapon_stats()
+        ):
+            rows.append(
+                StatRow(key=stat_type, label=label, value=value, selectable=True)
+            )
+
+        rows.append(StatRow(None, "", "", selectable=False))
+
+        # --- CRIT STUFF --
+        rows.append(StatRow(None, "CRITICAL ATTACKS", "", selectable=False))
+        for stat_type, (label, value) in zip(
+            list(combat_stat_types.CritStatTypes), self.gather_crit_stats()
+        ):
+            rows.append(
+                StatRow(key=stat_type, label=label, value=value, selectable=True)
+            )
+
+        rows.append(StatRow(None, "", "", selectable=False))
+
+        armor_stat_types = combat_stat_types.ArmorStatTypes
+
+        # --- DEFENSE ---
+        rows.append(StatRow(None, "DEFENSE", "", selectable=False))
+        for stat_type, (label, value) in zip(
+            list(armor_stat_types), self.gather_armor_stats()
+        ):
+
+            if stat_type == armor_stat_types.TOTAL:
+                rows.append(StatRow(None, "", "", selectable=False))
+                rows.append(
+                    StatRow(key=stat_type, label=label, value=value, selectable=True)
+                )
+            else:
+                rows.append(
+                    StatRow(key=stat_type, label=label, value=value, selectable=True)
+                )
+
+        rows.append(StatRow(None, "", "", selectable=False))
+
+        # --- SPEEDS ---
+        rows.append(StatRow(None, "SPEED", "", selectable=False))
+
+        speed_stat_types = combat_stat_types.SpeedStatTypes
+
+        for stat_type, (label, value) in zip(
+            list(speed_stat_types), self.gather_speed_stats()
+        ):
+            rows.append(
+                StatRow(key=stat_type, label=label, value=value, selectable=True)
+            )
+
+        self.combat_stat_rows = rows
+
+    def gather_weapon_stats(self) -> List[Tuple[str, str]]:
+        """
+        Gather weapon stats for UI display.
+
+        Always returns MAIN-HAND and OFF-HAND values.
+        Missing weapons are displayed as 'N/A'.
+        """
+        stats = self.engine.player.fighter.stats
+        equipment = self.engine.player.equipment
+        weapon_stat_types = combat_stat_types.WeaponStatTypes
+
+        main: Item | None = equipment.slots[EquipmentTypes.MAIN_HAND]
+        if main is not None:
+            main: WeaponEquippable = main.equippable
+        off: Item | None = equipment.slots[EquipmentTypes.OFF_HAND]
+        if off is not None:
+            off = off.equippable
+            if isinstance(off, ArmorEquippable):
+                off = None
+            off: WeaponEquippable
+
+        def format_range(weapon) -> str:
+            if weapon.weapon_range.is_melee:
+                return "MELEE"
+            return str(round_for_display(weapon.weapon_range.max_range))
+
+        def format_weapon_values(
+            weapon: WeaponEquippable | None,
+            fallback_index: int,
+        ) -> tuple[str, str, str, str]:
+            if weapon is None:
+                return ("N/A", "N/A", "N/A", "N/A")
+
+            attack = round_for_display(weapon.get_attack(self.engine.player).value)
+            damage = round_for_display(
+                weapon.get_damage(self.engine.player).totalled_damage
+            )
+            rng = format_range(weapon)
+            cost = round_for_display(
+                weapon.get_attack_init_cost(self.engine.player)
+                / consts.TRUE_INIT_FACTOR
+                * stats.initiative.attack_multiplier
+            )
+
+            return (str(attack), str(damage), str(rng), str(cost) + " INIT")
+
+        # --- pull values ---
+        main_vals = (
+            format_weapon_values(main, 0)
+            if main or off
+            else (
+                str(round_for_display(stats.attack[0])),
+                str(round_for_display(stats.damage[0].totalled_damage)),
+                (
+                    "MELEE"
+                    if stats.attack_range[0].is_melee
+                    else str(round_for_display(stats.attack_range[0].max_range))
+                ),
+                str(
+                    round_for_display(
+                        stats.attack_init_cost[0] / consts.TRUE_INIT_FACTOR
+                    )
+                )
+                + " INIT",
+            )
+        )
+
+        off_vals = format_weapon_values(off, 1)
+
+        rows: list[tuple[str, list[str]]] = [
+            (
+                f"{weapon_stat_types.ATTACK.value.upper()}: ",
+                [main_vals[0], off_vals[0]],
+            ),
+            (
+                f"{weapon_stat_types.DAMAGE.value.upper()}: ",
+                [main_vals[1], off_vals[1]],
+            ),
+            (f"{weapon_stat_types.RANGE.value.upper()}: ", [main_vals[2], off_vals[2]]),
+            (f"{weapon_stat_types.COST.value.upper()}: ", [main_vals[3], off_vals[3]]),
+        ]
+
+        return self.pad_weapon_stat_rows(rows)
+
+    def gather_crit_stats(self) -> List[Tuple[str, str]]:
+        crit_stat_type = combat_stat_types.CritStatTypes
+
+        rows: list[StatRow] = []
+
+        chance = (
+            round_for_display(self.engine.player.fighter.stats.critical_chance.value)
+            * 100
+        )
+        mult = round_for_display(
+            self.engine.player.fighter.stats.critical_multiplier.value
+        )
+
+        rows.append((f"{crit_stat_type.CRITICAL_CHANCE.value.upper()}: ", f"{chance}%"))
+        rows.append(
+            (f"{crit_stat_type.CRITICAL_MULTIPLIER.value.upper()}: ", f"{mult}")
+        )
+        return self.pad_stat_rows(rows)
+
+    def gather_armor_stats(self) -> List[Tuple[str, str]]:
+        armor_stat_type = combat_stat_types.ArmorStatTypes
+        stats = self.engine.player.fighter.stats
+
+        head = stats.head_defense.value
+        torso = stats.torso_defense.value
+        legs = stats.legs_defense.value
+        feet = stats.feet_defense.value
+        off_hand = stats.shield_defense.value
+        total = stats.total_defense
+
+        rows: List[Tuple[str, str]] = []
+        all_defenses = {
+            armor_stat_type.HEAD: head,
+            armor_stat_type.TORSO: torso,
+            armor_stat_type.LEGS: legs,
+            armor_stat_type.FEET: feet,
+            armor_stat_type.OFF_HAND: off_hand,
+            armor_stat_type.TOTAL: total,
+        }
+        for dtype, dval in all_defenses.items():
+            dval = round_for_display(dval)
+            rows.append((f"{dtype.value.upper()}: ", dval))
+
+        return self.pad_stat_rows(rows)
+
+    def gather_speed_stats(self) -> List[Tuple[str, str]]:
+        speed_stat_types = combat_stat_types.SpeedStatTypes
+        initiative = self.engine.player.fighter.stats.initiative
+
+        global_speed = initiative.global_speed.value
+        movement_speed = initiative.movement_speed.value
+        attack_speed = initiative.attack_speed.value
+        casting_speed = initiative.casting_speed.value
+
+        rows: List[Tuple[str, str]] = []
+        all_speeds = {
+            speed_stat_types.GLOBAL_SPEED: global_speed,
+            speed_stat_types.MOVEMENT_SPEED: movement_speed,
+            speed_stat_types.ATTACK_SPEED: attack_speed,
+            speed_stat_types.CASTING_SPEED: casting_speed,
+        }
+        for dtype, dval in all_speeds.items():
+            dval = round_for_display(dval)
+            rows.append((f"{dtype.value.upper()}: ", dval))
+
+        return self.pad_stat_rows(rows)
+
+    def pad_weapon_stat_rows(
+        self,
+        rows: List[Tuple[str, List[str]]],
+    ) -> List[Tuple[str, str]]:
+        """
+        Pad weapon stat rows into:
+            LABEL | MAIN-HAND | OFF-HAND
+
+        Always assumes exactly two columns.
+        """
+        if not rows:
+            return []
+
+        spacer = "  "
+
+        # --- label padding ---
+        max_label_width = max(len(label) for label, _ in rows)
+        padded_labels = [label.ljust(max_label_width) for label, _ in rows]
+
+        # --- column widths ---
+        main_width = max(len(values[0]) for _, values in rows)
+        off_width = max(len(values[1]) for _, values in rows)
+
+        final_rows: list[tuple[str, str]] = []
+
+        for padded_label, (_, values) in zip(padded_labels, rows):
+            main_val = values[0].ljust(main_width)
+            off_val = values[1].ljust(off_width)
+            final_rows.append((padded_label, spacer.join([main_val, off_val])))
+
+        return final_rows
+
+    def gather_damage_stats(self) -> List[Tuple[str, str]]:
+        """Gathers damage stats for horizontal UI display."""
+        stats = self.engine.player.fighter.stats
+        rows: List[Tuple[str, Dict[DamageTypes, str]]] = []
+
+        damage_stats = [
+            StatTypes.DAMAGE_RESISTS,
+            StatTypes.DAMAGE_AMPS,
+            StatTypes.DAMAGE_MASTERIES,
+        ]
+
+        labels = {
+            StatTypes.DAMAGE_RESISTS: "RESIST.",
+            StatTypes.DAMAGE_AMPS: "AMP.",
+            StatTypes.DAMAGE_MASTERIES: "MASTERY",
+        }
+
+        damage_objects = {
+            StatTypes.DAMAGE_RESISTS: stats.damage_resists,
+            StatTypes.DAMAGE_AMPS: stats.damage_amps,
+            StatTypes.DAMAGE_MASTERIES: stats.damage_masteries,
+        }
+
+        for stat_type in damage_stats:
+            label = labels[stat_type]
+            stat_obj = damage_objects[stat_type]
+
+            value: Dict[DamageTypes, str] = {}
+            for dtype in DamageTypes:
+                dstat: CharacterStat = getattr(stat_obj, dtype.normalized)
+                raw = (
+                    dstat.value / 100
+                    if stat_type == StatTypes.DAMAGE_MASTERIES
+                    else dstat.value
+                )
+                disp = round_for_display(raw)
+                value[dtype] = (
+                    f"{disp}" if stat_type == StatTypes.DAMAGE_MASTERIES else f"{disp}%"
+                )
+
+            rows.append((label, value))
+
+        return self.pad_damage_rows(rows)
+
+    def move_subtab_cursor(self, delta: int) -> None:
+        self.SELECTED_STAT_INDEX = None
+        n = len(self.SUBTABS)
+        self.SELECTED_SUBTAB = (self.SELECTED_SUBTAB + delta) % n
+
+    def move_stat_cursor(self, delta: int) -> None:
+        match self.SELECTED_SUBTAB:
+            case 0:
+                stat_rows = self.base_stat_rows
+            case 1:
+                stat_rows = self.damage_stat_rows
+            case 2:
+                stat_rows = self.combat_stat_rows
+
+        selectable_indices = [i for i, row in enumerate(stat_rows) if row.selectable]
+
+        if not selectable_indices:
+            return
+
+        if self.SELECTED_STAT_INDEX is None:
+            self.SELECTED_STAT_INDEX = selectable_indices[0 if delta > 0 else -1]
+            return
+
+        current_pos = selectable_indices.index(self.SELECTED_STAT_INDEX)
+        new_pos = (current_pos + delta) % len(selectable_indices)
+        self.SELECTED_STAT_INDEX = selectable_indices[new_pos]
+
     def render_base_stats(self, console: tcod.console.Console) -> None:
         x = self.text_x
         y = self.text_y + 1
 
-        console.print(x=x, y=y, text=f"NAME: {self.engine.player.personal_name}")
-        y += 2
-        console.print(x=x, y=y, text=f"LEVEL: {self.engine.player.level.current_level}")
-        y += 4
-
-        base_attributes = self.gather_base_attributes()
-
+        # Static info (still fine to render directly)
         console.print(
-            x=x,
-            y=y,
-            text="ATTRIBUTES",
-            fg=color.white,
-            bg=self.PALETTE.pitch,
+            x, y, f"NAME: {self.engine.player.personal_name}", fg=self.PALETTE.white
         )
         y += 2
-        for text in base_attributes:
-            text_abbrev = text[0][:3]
-            text_rest = text[0][3:]
-            val = text[1]
-            console.print(x=x + 2, y=y, text=text_abbrev, fg=color.white)
-            console.print(
-                x=x + 2 + len(text_abbrev),
-                y=y,
-                text=text_rest,
-                fg=self.PALETTE.mid_light,
-            )
-            console.print(x=x + 2 + len(text[0]), y=y, text=val, fg=self.PALETTE.light)
-            y += 2
-
-        y += 4
-        resources = self.gather_resources()
-
         console.print(
-            x=x,
-            y=y,
-            text="RESOURCES",
-            fg=color.white,
-            bg=self.PALETTE.pitch,
+            x,
+            y,
+            f"LEVEL: {self.engine.player.level.current_level}",
+            fg=self.PALETTE.white,
         )
         y += 2
-        for text in resources:
-            console.print(x=x + 2, y=y, text=text[0], fg=color.white)
-            console.print(
-                x=x + 2 + len(text[0]), y=y, text=text[1], fg=self.PALETTE.light
-            )
+        console.print(
+            x,
+            y,
+            f"EXP: {self.engine.player.level.current_xp}/"
+            f"{self.engine.player.level.experience_to_next_level}",
+            fg=self.PALETTE.white,
+        )
+        y += 4
+
+        # Stat list
+        for idx, row in enumerate(self.base_stat_rows):
+            if row.label == "ATTRIBUTES" or row.label == "RESOURCES":
+                console.print(
+                    x=x,
+                    y=y,
+                    text=row.label,
+                    fg=self.PALETTE.white,
+                    bg=self.PALETTE.dark,
+                )
+                y += 2
+                continue
+
+            if not row.label:
+                y += 1
+                continue
+
+            selected = idx == self.SELECTED_STAT_INDEX
+
+            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            bg = self.PALETTE.mid if selected else None
+
+            abbrev = row.label[:3]
+            rest = row.label[3:]
+
+            label_color = fg
+            if row.key in {
+                StatTypes.HP,
+                StatTypes.HP_REGEN,
+                StatTypes.ENERGY,
+                StatTypes.ENERGY_REGEN,
+                StatTypes.MANA,
+                StatTypes.MANA_REGEN,
+                StatTypes.CARRYING_CAPACITY,
+                StatTypes.ENCUMBRANCE,
+            }:
+                label_color = self.PALETTE.white if selected else self.PALETTE.light
+
+            abbrev_color = label_color
+            if row.key in {
+                StatTypes.STRENGTH,
+                StatTypes.DEXTERITY,
+                StatTypes.CONSTITUTION,
+                StatTypes.INTELLIGENCE,
+                StatTypes.CUNNING,
+                StatTypes.WILLPOWER,
+            }:
+                abbrev_color = self.PALETTE.white if selected else self.PALETTE.light
+
+            console.print(x + 2, y, abbrev, fg=abbrev_color, bg=bg)
+            console.print(x + 2 + len(abbrev), y, rest, fg=label_color, bg=bg)
+            console.print(x + 2 + len(row.label), y, row.value, fg=fg, bg=bg)
+
             y += 2
+
+        self._render_stat_description(console)
+
+    def _render_stat_description(self, console: tcod.console.Console) -> None:
+
+        match self.SELECTED_SUBTAB:
+            case 0:
+                stat_rows = self.base_stat_rows
+                stat_descriptions = self.BASE_STATS_DESCRIPTIONS
+                vertical = True
+            case 1:
+                stat_rows = self.damage_stat_rows
+                stat_descriptions = self.DAMAGE_STAT_DESCRIPTIONS
+                vertical = False
+            case 2:
+                stat_rows = self.combat_stat_rows
+                stat_descriptions = self.COMBAT_STAT_DESCRIPTIONS
+                vertical = True
+            case _:
+                raise ValueError("literally how")
+
+        if self.SELECTED_STAT_INDEX is None:
+            return
+
+        row = stat_rows[self.SELECTED_STAT_INDEX]
+        if row.key is None:
+            return
+
+        descriptor = next(d for d in stat_descriptions if d.key == row.key)
+
+        if vertical:
+            x = self.frame_width // 2 + self.x + 2
+            y = self.text_y + 1
+        else:
+            x = self.text_x
+            y = self.frame_height // 2 + self.y + 2
+
+        console.print(x, y, descriptor.label, fg=self.PALETTE.white)
+        y += 2
+        if isinstance(descriptor.description, list):
+            for desc in descriptor.description:
+                text = f"{desc}" if desc == descriptor.description[0] else f"  {desc}"
+                console.print(x, y, text, fg=self.PALETTE.light)
+                y += 2 if desc != descriptor.description[-1] else 4
+        else:
+            console.print(x, y, descriptor.description, fg=self.PALETTE.light)
+            y += 2
+        y += 2
+
+        if descriptor.formula:
+            if isinstance(descriptor.formula, list):
+                for desc in descriptor.formula:
+                    text = (
+                        f"FORMULA: {desc}"
+                        if desc == descriptor.formula[0]
+                        else f"  {desc}"
+                    )
+                    console.print(x, y, text, fg=self.PALETTE.light)
+                    y += 2
+            else:
+                console.print(
+                    x, y, f"FORMULA: {descriptor.formula}", fg=self.PALETTE.light
+                )
 
     def render_damage_stats(self, console: tcod.console.Console) -> None:
-        pass
+        x = self.text_x + 2
+        y = self.text_y + 1
+
+        # Header row: damage type abbreviations
+        header_labels = []
+        header_labels.append("       ")
+        for dt in DamageTypes:
+            header_labels.append(menu_text.DAMAGE_TYPE_ABBREVIATIONS[dt])
+
+        header = "  ".join(header_labels)
+
+        console.print(
+            x=x,
+            y=y,
+            text=header,
+            fg=self.PALETTE.white,
+        )
+        y += 2
+
+        for idx, row in enumerate(self.damage_stat_rows):
+
+            selected = idx == self.SELECTED_STAT_INDEX
+
+            if not row.label:
+                y += 1
+                continue
+
+            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            bg = self.PALETTE.mid if selected else None
+
+            console.print(
+                x=x,
+                y=y,
+                text=f"{row.label} ",
+                fg=self.PALETTE.white if selected else self.PALETTE.light,
+                bg=bg,
+            )
+
+            console.print(x=x + len(row.label), y=y, text=f"{row.value}", fg=fg, bg=bg)
+
+            y += 2
+
+        self._render_stat_description(console)
 
     def render_combat_stats(self, console: tcod.console.Console) -> None:
-        pass
+        x = self.text_x + 2
+        y = self.text_y + 1
+
+        # --- header ---
+        header = "WEAPONS   " + "MAIN-HAND" + "  " + "OFF-HAND"
+
+        console.print(x, y, header, fg=self.PALETTE.white)
+        y += 2
+
+        # --- rows ---
+        for idx, row in enumerate(self.combat_stat_rows):
+            if not row.label:
+                y += 1
+                continue
+
+            selected = idx == self.SELECTED_STAT_INDEX
+
+            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            bg = self.PALETTE.mid if selected else None
+
+            if row.label in {"DEFENSE", "CRITICAL ATTACKS", "SPEED"}:
+                fg = self.PALETTE.white
+                console.print(x, y, f"{row.label}", fg=self.PALETTE.light)
+                y += 2
+                continue
+
+            console.print(x + 2, y, f"{row.label}", fg=fg, bg=bg)
+
+            console.print(x + 2 + len(row.label), y, f"{row.value}", fg=fg, bg=bg)
+            y += 2
+
+        self._render_stat_description(console)
 
     def gather_base_attributes(self) -> List[Tuple[str, str]]:
         """
@@ -753,80 +1378,59 @@ class CharacterStatsHandler(AskUserEventHandler):
 
         return padded[0] if is_single else padded
 
+    def pad_damage_rows(
+        self,
+        rows: List[Tuple[str, Dict[DamageTypes, str]]],
+    ) -> List[Tuple[str, str]]:
+        """
+        Pad damage stat rows into a single horizontal string per row.
+
+        Columns are LEFT-justified and share widths with headers.
+        """
+        if not rows:
+            return []
+
+        spacer = " "
+
+        damage_types = list(DamageTypes)
+
+        # --- label padding ---
+        max_label_width = max(len(label) for label, _ in rows)
+        padded_labels = [label.ljust(max_label_width) for label, _ in rows]
+
+        # --- column widths (values vs headers) ---
+        col_widths: dict[DamageTypes, int] = {}
+
+        for dtype in damage_types:
+            header_width = 6
+            value_width = max(len(values[dtype]) for _, values in rows)
+            col_widths[dtype] = max(header_width, value_width)
+
+        # --- assemble final rows ---
+        final_rows: list[tuple[str, str]] = []
+
+        for (label, values), padded_label in zip(rows, padded_labels):
+            cols = [values[dtype].ljust(col_widths[dtype]) for dtype in damage_types]
+            final_rows.append((padded_label + "  ", spacer.join(cols)))
+
+        return final_rows
+
     def on_render(self, console):
-        super().on_render(console)
-        console.draw_frame(
-            x=self.x,
-            y=self.y,
-            width=self.frame_width,
-            height=self.frame_height,
-            clear=True,
-            fg=self.PALETTE.light,
-            bg=self.PALETTE.dark,
-        )
-
-        console.print(self.title_x, self.y, self.TITLE)
-
-        # top-level tabs
-        render_functions.render_tabs(
-            console=console,
-            x=self.tabs_x,
-            y=self.tabs_y,
-            tabs=self.TABS_NAMES,
-            selected_index=self.SELECTED_TAB,
-            selected_fg=self.PALETTE.light,
-            selected_bg=self.PALETTE.mid,
-            unselected_fg=self.PALETTE.unselected,
-        )
-
-        console.print(
-            x=self.x + 2,
-            y=self.tabs_y + 2,
-            text="─" * (self.frame_width - 4),
-            fg=self.PALETTE.mid_light,
-        )
-
-        # subtabs
-        render_functions.render_tabs(
-            console=console,
-            x=self.subtabs_x,
-            y=self.subtabs_y,
-            tabs=self.SUBTABS,
-            selected_index=self.SELECTED_SUBTAB,
-            selected_fg=self.PALETTE.light,
-            selected_bg=self.PALETTE.mid,
-            unselected_fg=self.PALETTE.unselected,
-        )
-
-        console.print(
-            x=self.x + 3,
-            y=self.subtabs_y + 2,
-            text="─" * (self.frame_width - 6),
-            fg=self.PALETTE.mid,
-        )
 
         match self.SELECTED_SUBTAB:
             case 0:
+                super().on_render(console)
                 self.render_base_stats(console)
             case 1:
+                super().on_render(
+                    console,
+                    vertical_split=False,
+                    horizontal_split_y=(self.y + self.frame_height) // 2,
+                )
                 self.render_damage_stats(console)
             case 2:
+                super().on_render(console)
                 self.render_combat_stats(console)
-
-        for i in range(self.frame_height - 13):
-            console.print(
-                x=(self.frame_width + self.x) // 2,
-                y=self.text_y + i,
-                text="║",
-                fg=self.PALETTE.mid_dark,
-            )
-
-        console.print(
-            x=self.x + 3,
-            y=self.frame_height - 1,
-            text="─" * (self.frame_width - 6),
-            fg=self.PALETTE.mid,
-        )
 
     def _handle_key(self, event):
         key = event.sym

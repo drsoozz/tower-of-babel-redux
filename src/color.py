@@ -22,6 +22,7 @@ class Palette:
     mid_light: tuple[int, int, int]
     light: tuple[int, int, int]
     unselected: tuple[int, int, int] = (160, 160, 160)
+    white: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)
 
 
 white = (0xFF, 0xFF, 0xFF)
@@ -73,13 +74,9 @@ bar_initiative_empty = (0x00, 0x1B, 0x00)
 
 menu_title = (255, 255, 63)
 menu_text = white
-menu_essence_tab_fg = (57, 237, 237)
-menu_essence_tab_bg = (20, 40, 40)
-menu_inventory_tab_fg = (237, 87, 57)
-menu_inventory_tab_bg = (40, 20, 40)
 
 # stats menu stuff
-menu_stats_palette = Palette(
+menu_inventory_palette = Palette(
     pitch=(4, 0, 5),
     dark=(13, 0, 16),
     mid_dark=(59, 14, 67),
@@ -88,13 +85,31 @@ menu_stats_palette = Palette(
     light=(236, 208, 240),
 )
 
-menu_stats_tab_fg = (210, 57, 237)
-menu_stats_tab_bg = (40, 40, 20)
-menu_stats_subtab_fg = (156, 43, 178)
-menu_stats_subtab_bg = (30, 30, 15)
+menu_stats_palette = Palette(
+    pitch=(8, 0, 1),
+    dark=(23, 0, 1),
+    mid_dark=(101, 19, 21),
+    mid=(167, 67, 70),
+    mid_light=(247, 165, 167),
+    light=(255, 220, 221),
+)
 
-menu_skills_tab_fg = (237, 201, 57)
-menu_skills_tab_bg = (30, 30, 30)
+menu_essence_palette = Palette(
+    pitch=(1, 0, 15),
+    dark=(3, 2, 16),
+    mid_dark=(27, 21, 71),
+    mid=(64, 56, 117),
+    mid_light=(129, 123, 173),
+    light=(217, 213, 242),
+)
+
+menu_skill_palette = Palette(
+    pitch=(6, 8, 0),
+    dark=(20, 23, 0),
+    mid_dark=(90, 100, 19),
+    mid=(153, 164, 66),
+    mid_light=(234, 243, 163),
+    light=(250, 254, 219),
+)
 
 menu_unselected_fg = (160, 160, 160)
-menu_selected_text = (237, 57, 57)
