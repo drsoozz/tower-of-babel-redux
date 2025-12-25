@@ -56,14 +56,7 @@ class PickupAction(Action):
 
         for item in self.engine.game_map.items:
             if actor_location_x == item.x and actor_location_y == item.y:
-                if len(inventory.items) >= inventory.capacity:
-                    raise exceptions.Impossible("Your inventory is full.")
-
-                self.engine.game_map.entities.remove(item)
-                item.parent = self.entity.inventory
-                inventory.items.append(item)
-
-                self.engine.message_log.add_message(f"You picked up the {item.name}!")
+                self.engine.player.inventory.add(item)
                 self.apply_cost()
                 return
 
@@ -249,9 +242,6 @@ class AttackAction(Action):
 
 
 class MeleeAction(ActionWithDirection):
-
-    # TODO: eventually redo this when adding more than just base stats
-
     def perform(self) -> None:
         target = self.target_actor
         if not target:

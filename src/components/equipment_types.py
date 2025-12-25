@@ -29,21 +29,33 @@ class EquipmentTypes(str, BaseEnum):
         ACCESSORY1-4: Flexible trinket slots for charms, talismans, relics, etc.
     """
 
+    # weapon slots
     MAIN_HAND = "main-hand"
     OFF_HAND = "off-hand"
+
+    # armor slots
     HEAD = "head"
-    FACE = "face"
     TORSO = "torso"
+    LEGS = "legs"
+    FEET = "feet"
+
+    # clothing accessories
+    FACE = "face"
     BACK = "back"
     ARMS = "arms"
     WAIST = "waist"
-    LEGS = "legs"
-    FEET = "feet"
+
     NECKLACE = "necklace"
-    RING_1 = "ring 1"
-    RING_2 = "ring 2"
+
+    # earrings
     EARRING_1 = "earring 1"
     EARRING_2 = "earring 2"
+
+    # rings
+    RING_1 = "ring 1"
+    RING_2 = "ring 2"
+
+    # accessories
     ACCESSORY_1 = "accessory 1"
     ACCESSORY_2 = "accessory 2"
     ACCESSORY_3 = "accessory 3"

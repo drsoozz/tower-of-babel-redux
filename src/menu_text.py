@@ -9,6 +9,7 @@ from components.stats.combat_stat_types import (
     CritStatTypes,
     SpeedStatTypes,
 )
+from entity import Item
 
 
 @dataclass
@@ -17,6 +18,14 @@ class StatRow:
     label: str  # already padded
     value: str
     selectable: bool  # can cursor land here?
+
+
+@dataclass
+class InventoryRow:
+    item: Optional[Item]
+    letter: Optional[str]
+    name: Optional[str]
+    selectable: bool
 
 
 @dataclass(frozen=True)

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from tcod.console import Console
     from engine import Engine
     from game_map import GameMap
+    from entity import Item
 
 
 def render_gui_frame(console: Console, y: int) -> None:
@@ -137,7 +138,7 @@ def render_character_information_screens(
     vertical_split: bool = True,  # if false, make a horizontal split line in the middle of the screen, not a vertical one!
     horizontal_split_y: int = None,  # only used if vertical_split is False
 ) -> None:
-    TABS_NAMES = ["INVENTORY [I]", "STATS [O]", "ESSENCES [J]", "SKILLS [K]"]
+    TABS_NAMES = ["INVENTORY", "STATS", "ESSENCES", "SKILLS"]
     console.draw_frame(
         x=x,
         y=y,
@@ -210,3 +211,13 @@ def render_character_information_screens(
             text="─" * (frame_width - 6),
             fg=palette.mid_dark,
         )
+
+
+def get_item_inventory_color(item: Item) -> tuple[int, int, int]:
+    color = item.color
+    weighter = 255
+    return (
+        (color[0] + weighter) / 2,
+        (color[1] + weighter) / 2,
+        (color[2] + weighter) / 2,
+    )

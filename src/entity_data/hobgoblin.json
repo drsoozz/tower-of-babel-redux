@@ -1,7 +1,7 @@
 {
     "entity_type": "actor",
     "char": "h",
-    "color": [44, 184, 0],
+    "color": [224, 101, 92],
     "name": "Hobgoblin",
     "ai_cls": "HostileEnemy",
     "monster_tier": 1,

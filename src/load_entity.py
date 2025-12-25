@@ -54,22 +54,31 @@ def load_entity(entity_name: str) -> Item | Actor:
     char: str = data["char"]
     color: tuple = tuple(data["color"])
     name: str = data["name"]
+    description: str = data.get("description", "No description is currently available.")
     weight: float = data.get("weight", None)
     if entity_type.lower() == "item":
         item_components = load_item_components(data)
-        item_args = {"char": char, "color": color, "name": name, "weight": weight}
+        item_args = {
+            "char": char,
+            "color": color,
+            "name": name,
+            "description": description,
+            "weight": weight,
+        }
         for component_name, component_obj in item_components.items():
             if component_name == "weight":
                 if weight is None:
                     item_args[component_name] = component_obj
             else:
                 item_args[component_name] = component_obj
+        item_args["description"] = description
         return Item(**item_args)
     if entity_type.lower() == "actor":
         actor_args = load_actor(data)
         actor_args["char"] = char
         actor_args["color"] = color
         actor_args["name"] = name
+        actor_args["description"] = description
         return Actor(**actor_args)
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from typing import Callable, Optional, Tuple, TYPE_CHECKING, Union, Dict, List
+import math
 
 import tcod
 
@@ -11,7 +12,7 @@ from actions import Action, BumpAction, PickupAction, WaitAction
 import color
 import consts
 import menu_text
-from menu_text import StatDescriptor, StatRow
+from menu_text import StatDescriptor, StatRow, InventoryRow
 import exceptions
 from components.stats.stat_types import StatTypes
 from components.stats.damage_types import DamageTypes
@@ -20,7 +21,8 @@ import render_functions
 from components.stats import combat_stat_types
 from components.stats.resource import Resource
 from components.equipment_types import EquipmentTypes
-from components.items.equippable import WeaponEquippable, ArmorEquippable
+from components.items.equippable import WeaponEquippable, ArmorEquippable, Equippable
+from components.stats.stat_modifier import StatModifier
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -535,7 +537,7 @@ class QueryRestLoopHandler(AskUserEventHandler):
 
 class CharacterInformationHandler(AskUserEventHandler):
     TITLE = "CHARACTER INFORMATION"
-    TABS_NAMES = ["INVENTORY [I]", "STATS [O]", "ESSENCES [J]", "SKILLS [K]"]
+    TABS_NAMES = ["INVENTORY", "STATS", "ESSENCES", "SKILLS"]
     TABS_SPACER = "  "
     TABS = TABS_NAMES[0] + TABS_SPACER + TABS_NAMES[1] + TABS_SPACER + TABS_NAMES[2]
     SELECTED_TAB: int
@@ -616,8 +618,6 @@ class CharacterInformationHandler(AskUserEventHandler):
 
 
 class CharacterStatsHandler(CharacterInformationHandler):
-    TITLE = "CHARACTER INFORMATION"
-
     SUBTABS = ["BASE", "DAMAGE", "COMBAT"]
     SELECTED_SUBTAB = 0
     SUBTAB_SPACER = "  "
@@ -1089,13 +1089,13 @@ class CharacterStatsHandler(CharacterInformationHandler):
 
             selected = idx == self.SELECTED_STAT_INDEX
 
-            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            fg = self.PALETTE.white if selected else self.PALETTE.light
             bg = self.PALETTE.mid if selected else None
 
             abbrev = row.label[:3]
             rest = row.label[3:]
 
-            label_color = fg
+            label_color = self.PALETTE.white if selected else self.PALETTE.mid_light
             if row.key in {
                 StatTypes.HP,
                 StatTypes.HP_REGEN,
@@ -1106,7 +1106,7 @@ class CharacterStatsHandler(CharacterInformationHandler):
                 StatTypes.CARRYING_CAPACITY,
                 StatTypes.ENCUMBRANCE,
             }:
-                label_color = self.PALETTE.white if selected else self.PALETTE.light
+                label_color = self.PALETTE.white if selected else self.PALETTE.mid_light
 
             abbrev_color = label_color
             if row.key in {
@@ -1216,14 +1216,14 @@ class CharacterStatsHandler(CharacterInformationHandler):
                 y += 1
                 continue
 
-            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            fg = self.PALETTE.white if selected else self.PALETTE.light
             bg = self.PALETTE.mid if selected else None
 
             console.print(
                 x=x,
                 y=y,
                 text=f"{row.label} ",
-                fg=self.PALETTE.white if selected else self.PALETTE.light,
+                fg=self.PALETTE.white if selected else self.PALETTE.mid_light,
                 bg=bg,
             )
 
@@ -1251,16 +1251,22 @@ class CharacterStatsHandler(CharacterInformationHandler):
 
             selected = idx == self.SELECTED_STAT_INDEX
 
-            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            fg = self.PALETTE.white if selected else self.PALETTE.light
             bg = self.PALETTE.mid if selected else None
 
             if row.label in {"DEFENSE", "CRITICAL ATTACKS", "SPEED"}:
                 fg = self.PALETTE.white
-                console.print(x, y, f"{row.label}", fg=self.PALETTE.light)
+                console.print(x, y, f"{row.label}", fg=self.PALETTE.white)
                 y += 2
                 continue
 
-            console.print(x + 2, y, f"{row.label}", fg=fg, bg=bg)
+            console.print(
+                x + 2,
+                y,
+                f"{row.label}",
+                fg=self.PALETTE.white if selected else self.PALETTE.mid_light,
+                bg=bg,
+            )
 
             console.print(x + 2 + len(row.label), y, f"{row.value}", fg=fg, bg=bg)
             y += 2
@@ -1436,15 +1442,20 @@ class CharacterStatsHandler(CharacterInformationHandler):
         key = event.sym
         modifier = event.mod
 
+        # character information screen traversal
         if key == tcod.event.KeySym.LEFT and modifier & (
             tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
         ):
-            self.move_tab_cursor(-1)
-        elif key == tcod.event.KeySym.RIGHT and modifier & (
+            return CharacterInventoryHandler(self.engine)
+
+        if key == tcod.event.KeySym.RIGHT and modifier & (
             tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
         ):
-            self.move_tab_cursor(1)
-        elif key == tcod.event.KeySym.LEFT:
+            # essence screen
+            pass
+
+        # cursor movement
+        if key == tcod.event.KeySym.LEFT:
             self.move_subtab_cursor(-1)
         elif key == tcod.event.KeySym.RIGHT:
             self.move_subtab_cursor(1)
@@ -1453,6 +1464,386 @@ class CharacterStatsHandler(CharacterInformationHandler):
         elif key == tcod.event.KeySym.DOWN:
             self.move_stat_cursor(1)
         return super()._handle_key(event)
+
+
+class CharacterInventoryHandler(CharacterInformationHandler):
+    SUBTABS = ["INVENTORY", "EQUIPMENT"]
+    SELECTED_SUBTAB = 0
+    SUBTAB_SPACER = "  "
+    SELECTED_INVENTORY_INDEX = None
+    SELECTED_INVENTORY_PAGE = 0
+    MAX_INVENTORY_PAGE = None
+    INVENTORY_ROWS_LENGTH = 26
+
+    def __init__(self, engine):
+        super().__init__(
+            engine,
+            selected_tab=0,
+            palette=color.menu_inventory_palette,
+            subtabs=self.SUBTABS,
+            selected_subtab=self.SELECTED_SUBTAB,
+        )
+
+        self.item_list = []
+        self.equipment = []
+        self.inventory_rows: List[InventoryRow] = []
+        self.MAX_INVENTORY_PAGE = None
+        self.active_inventory_rows: List[InventoryRow] = []
+        self.equipment_rows: List[InventoryRow] = []
+        self.regenerate_inventory()
+
+        self.item_info_handler = CharacterInventoryItemInformationhandler(
+            self.engine, self
+        )
+        self.item_info_handler.parent = self
+
+    def regenerate_inventory(self) -> None:
+        self._build_item_list()
+        self._build_equipment()
+        self._build_inventory_rows()
+        self.MAX_INVENTORY_PAGE = math.floor(
+            len(self.item_list) / self.INVENTORY_ROWS_LENGTH
+        )
+        self._build_active_inventory_rows()
+        self._build_equipment_rows()
+
+    def _build_item_list(self) -> None:
+        self.item_list = self.engine.player.inventory.items
+
+    def _build_equipment(self) -> None:
+        self.equipment = self.engine.player.equipment.slots
+
+    @classmethod
+    def add_row_spacer(cls, rows: List[InventoryRow]) -> None:
+        rows.append(InventoryRow(item=None, letter=None, name=None, selectable=False))
+
+    def _build_inventory_rows(self) -> List[InventoryRow]:
+        rows: List[InventoryRow] = []
+
+        for idx, item in enumerate(self.item_list):
+            item: Item
+            letter = chr(ord("a") + (idx % 26))
+            name = item.name
+            if item in self.equipment.values():
+                name += " (E)"
+            selectable = True
+            rows.append(
+                InventoryRow(item=item, letter=letter, name=name, selectable=selectable)
+            )
+        self.inventory_rows = rows
+
+    def _build_active_inventory_rows(self) -> List[InventoryRow]:
+        rows: List[InventoryRow]
+        if self.SELECTED_INVENTORY_PAGE == self.MAX_INVENTORY_PAGE:
+            rows = self.inventory_rows[
+                self.INVENTORY_ROWS_LENGTH * self.SELECTED_INVENTORY_PAGE :
+            ]
+        else:
+            rows = self.inventory_rows[
+                self.INVENTORY_ROWS_LENGTH
+                * self.SELECTED_INVENTORY_PAGE : self.INVENTORY_ROWS_LENGTH
+                * (self.SELECTED_INVENTORY_PAGE + 1)
+            ]
+        self.active_inventory_rows = rows
+
+    def _build_equipment_rows(self) -> List[InventoryRow]:
+        rows: List[InventoryRow] = []
+
+        for etype in list(EquipmentTypes):
+            if etype == EquipmentTypes.ESSENCE:
+                # not in equipment screen, it's in the Essences screen!
+                continue
+            item = self.equipment.get(etype, None)
+            if not isinstance(item, Equippable):
+                item = None
+                letter = etype.value.upper()
+                name = "N/A"
+                selectable = False
+            else:
+                item: Item
+                letter = etype.value.upper()
+                name = item.name
+                selectable = True
+            rows.append(
+                InventoryRow(item=item, letter=letter, name=name, selectable=selectable)
+            )
+
+            if etype in {
+                EquipmentTypes.OFF_HAND,
+                EquipmentTypes.FEET,
+                EquipmentTypes.WAIST,
+                EquipmentTypes.EARRING_2,
+                EquipmentTypes.RING_2,
+                EquipmentTypes.NECKLACE,
+                EquipmentTypes.ACCESSORY_4,
+            }:
+                self.add_row_spacer(rows)
+
+        self.equipment_rows = rows
+
+    def move_selection_cursor(self, delta: int) -> None:
+        match self.SELECTED_SUBTAB:
+            case 0:
+                self.move_inventory_cursor(delta)
+            case 1:
+                self.move_equipment_cursor(delta)
+
+    def move_inventory_cursor(self, delta: int) -> None:
+        if self.SELECTED_INVENTORY_INDEX is None:
+            selectable_indices = [
+                i for i, row in enumerate(self.inventory_rows) if row.selectable
+            ]
+            if not selectable_indices:
+                return
+
+            if delta < 0:
+                # last item of last page
+                self.SELECTED_INVENTORY_PAGE = self.MAX_INVENTORY_PAGE
+                self.SELECTED_INVENTORY_INDEX = selectable_indices[-1]
+            else:
+                self.SELECTED_INVENTORY_INDEX = selectable_indices[0]
+            return
+
+        selectable_indices = [
+            i for i, row in enumerate(self.active_inventory_rows) if row.selectable
+        ]
+
+        if not selectable_indices:
+            return
+
+        current_pos = selectable_indices.index(self.SELECTED_INVENTORY_INDEX)
+        new_pos = current_pos + delta
+        if self.MAX_INVENTORY_PAGE != 0:
+            underflow = selectable_indices[0]
+            overflow = selectable_indices[-1]
+            if new_pos < underflow or new_pos > overflow:
+                # 1) update the page
+                self.SELECTED_INVENTORY_PAGE = (
+                    self.SELECTED_INVENTORY_PAGE + delta
+                ) % (self.MAX_INVENTORY_PAGE + 1)
+
+                # 2) regenerate self.active_inventory_rows
+                self._build_active_inventory_rows()
+
+                # 3) recreate selectable_indices
+                selectable_indices = [
+                    i
+                    for i, row in enumerate(self.active_inventory_rows)
+                    if row.selectable
+                ]
+
+                # 4) set index
+                self.SELECTED_INVENTORY_INDEX = (
+                    selectable_indices[0] if delta > 0 else selectable_indices[-1]
+                )
+                return
+            self.SELECTED_INVENTORY_INDEX = selectable_indices[new_pos]
+        else:
+            new_pos %= len(selectable_indices)
+            self.SELECTED_INVENTORY_INDEX = selectable_indices[new_pos]
+
+    def move_equipment_cursor(self, delta: int) -> None:
+        selectable_indices = [
+            i for i, row in enumerate(self.equipment_rows) if row.selectable
+        ]
+        current_pos = selectable_indices.index(self.SELECTED_INVENTORY_INDEX)
+        new_pos = (current_pos + delta) % len(selectable_indices)
+        self.SELECTED_INVENTORY_INDEX = new_pos
+
+    def render_inventory(self, console: tcod.console.Console) -> None:
+
+        x = self.text_x
+        y = self.text_y + 1
+
+        for idx, item in enumerate(self.active_inventory_rows):
+            if not item.letter:
+                y += 1
+                continue
+            selected = idx == self.SELECTED_INVENTORY_INDEX
+            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            name_fg = self.PALETTE.white if selected else self.PALETTE.light
+            bg = self.PALETTE.mid_dark if selected else None
+            letter_starter = f"{item.letter}) "
+            item_name = f"{item.name}"
+            console.print(x=x, y=y, text=letter_starter, fg=fg, bg=bg)
+            console.print(
+                x=x + len(letter_starter), y=y, text=item_name, fg=name_fg, bg=bg
+            )
+            y += 2
+
+    def render_equipment(self, console: tcod.console.Console) -> None:
+        x = self.text_x
+        y = self.text_y
+
+        for idx, item in enumerate(self.equipment_rows):
+            if not item.letter:
+                y += 1
+                continue
+
+            selected = idx == self.SELECTED_INVENTORY_INDEX
+            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            name_fg = self.PALETTE.white if selected else self.PALETTE.light
+            bg = self.PALETTE.mid_dark if selected else None
+
+            title_fg = self.PALETTE.white
+
+            if item.letter == EquipmentTypes.MAIN_HAND.value.upper():
+                console.print(x=x, y=y, text="WEAPON SLOTS", fg=title_fg)
+                y += 2
+            elif item.letter == EquipmentTypes.HEAD.value.upper():
+                console.print(x=x, y=y, text="ARMOR SLOTS", fg=title_fg)
+                y += 2
+            elif item.letter == EquipmentTypes.FACE.value.upper():
+                console.print(x=x, y=y, text="MISC. CLOTHING SLOTS", fg=title_fg)
+                y += 2
+            elif item.letter == EquipmentTypes.NECKLACE.value.upper():
+                console.print(x=x, y=y, text="MISC. JEWELRY SLOTS", fg=title_fg)
+                y += 2
+
+            equipment_name = f"  {item.letter}: "
+            item_name = f"{item.name}"
+            console.print(x=x, y=y, text=equipment_name, fg=fg, bg=bg)
+            console.print(
+                x=x + len(equipment_name), y=y, text=item_name, fg=name_fg, bg=bg
+            )
+            y += 2
+
+    def on_render(self, console):
+        super().on_render(console)
+        match self.SELECTED_SUBTAB:
+            case 0:
+                self.render_inventory(console)
+            case 1:
+                self.render_equipment(console)
+
+    def _handle_key(self, event):
+        key = event.sym
+        modifier = event.mod
+
+        # character information screens traversal
+        if key == tcod.event.KeySym.LEFT and modifier & (
+            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
+        ):
+            # skills screen
+            pass
+        if key == tcod.event.KeySym.RIGHT and modifier & (
+            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
+        ):
+            return CharacterStatsHandler(self.engine)
+
+        # cursor movement
+        if key == tcod.event.KeySym.LEFT:
+            self.move_subtab_cursor(-1)
+        elif key == tcod.event.KeySym.RIGHT:
+            self.move_subtab_cursor(1)
+        elif key == tcod.event.KeySym.UP:
+            self.move_selection_cursor(-1)
+        elif key == tcod.event.KeySym.DOWN:
+            self.move_selection_cursor(1)
+
+        return super()._handle_key(event)
+
+
+class CharacterInventoryItemInformationhandler(EventHandler):
+    parent: CharacterInventoryHandler
+
+    def __init__(self, engine, parent):
+        super().__init__(engine)
+        self.item: Optional[Item] = None
+        self.x = None
+        self.y = None
+        self.parent = parent
+
+    @property
+    def starting_x(self) -> int:
+        return self.parent.frame_width // 2 + self.parent.x + 2
+
+    @property
+    def starting_y(self) -> int:
+        return self.parent.text_y + 1
+
+    @property
+    def max_char_width(self) -> int:
+        return self.starting_x - (self.parent.x - self.parent.frame_width)
+
+    @property
+    def name(self) -> str:
+        return self.item.name
+
+    @property
+    def description(self) -> str:
+        return self.item.description
+
+    @property
+    def weight(self) -> str:
+        return f"{round_for_display(self.item.weight)} lbs"
+
+    @property
+    def item_color(self) -> Tuple[int, int, int]:
+        return render_functions.get_item_inventory_color(self.item)
+
+    @property
+    def palette(self) -> color.Palette:
+        return self.parent.PALETTE
+
+    @property
+    def etypes(self) -> Tuple[EquipmentTypes]:
+        if self.item.equippable:
+            etypes = self.item.equippable.equipment_type
+            if not isinstance(etypes, tuple):
+                etypes = (etypes,)
+            return etypes
+        return None
+
+    @property
+    def bonuses(self) -> Optional[
+        Dict[
+            StatTypes | Tuple[StatTypes, DamageTypes],
+            StatModifier | List[StatModifier],
+        ]
+    ]:
+        if self.item.equippable:
+            return self.item.equippable.bonuses
+
+    def on_render(self, console: tcod.console.Console):
+        if self.parent.SELECTED_INVENTORY_INDEX is None:
+            return
+
+        match self.parent.SELECTED_SUBTAB:
+            case 0:
+                rows = self.parent.inventory_rows
+            case _:
+                rows = self.parent.equipment_rows
+
+        self.item = rows[self.parent.SELECTED_INVENTORY_INDEX].item
+
+        if self.item is None:
+            return
+
+        self.x = self.frame_width // 2 + self.x + 2
+        self.y = self.text_y + 1
+
+        self.render_name(console)
+
+        if self.item is not None:
+            if self.item.consumable:
+                self.render_consumable(console)
+            elif self.item.equippable:
+                self.render_equippable(console)
+
+    def render_name(self, console) -> None:
+        console.print(x=self.x, y=self.y, text=self.name, fg=self.item_color)
+        self.y += 4
+
+    def render_description(self, console) -> None:
+        pass
+
+    def render_consumable(self, console) -> None:
+        # TODO: eventually, one day...
+        pass
+
+    def render_equippable(self, console) -> None:
+        pass
 
 
 class LevelUpEventHandler(AskUserEventHandler):

@@ -1,8 +1,9 @@
 {
     "entity_type": "item",
-    "char": "/",
-    "color": [0, 191, 255],
+    "char": "?",
+    "color": [224, 101, 92],
     "name": "Hobgoblin's Pauldrons",
+    "description": "These pauldrons are surprisingly well made. They also seem to have been chewed on.",
     "weight": 2.1,
     "equippable": {
         "slots": "arms",
