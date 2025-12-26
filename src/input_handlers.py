@@ -14,8 +14,10 @@ import consts
 import menu_text
 from menu_text import StatDescriptor, StatRow, InventoryRow
 import exceptions
+from entity import Item
 from components.stats.stat_types import StatTypes
 from components.stats.damage_types import DamageTypes
+from components.stats.stat_mod_types import StatModType
 from render_functions import round_for_display
 import render_functions
 from components.stats import combat_stat_types
@@ -26,7 +28,6 @@ from components.stats.stat_modifier import StatModifier
 
 if TYPE_CHECKING:
     from engine import Engine
-    from entity import Item
     from components.stats.character_stat import CharacterStat
 MOVE_KEYS = {
     # Arrow keys.
@@ -1005,9 +1006,9 @@ class CharacterStatsHandler(CharacterInformationHandler):
             for dtype in DamageTypes:
                 dstat: CharacterStat = getattr(stat_obj, dtype.normalized)
                 raw = (
-                    dstat.value / 100
+                    dstat.value
                     if stat_type == StatTypes.DAMAGE_MASTERIES
-                    else dstat.value
+                    else dstat.value * 100
                 )
                 disp = round_for_display(raw)
                 value[dtype] = (
@@ -1020,8 +1021,7 @@ class CharacterStatsHandler(CharacterInformationHandler):
 
     def move_subtab_cursor(self, delta: int) -> None:
         self.SELECTED_STAT_INDEX = None
-        n = len(self.SUBTABS)
-        self.SELECTED_SUBTAB = (self.SELECTED_SUBTAB + delta) % n
+        super().move_subtab_cursor(delta)
 
     def move_stat_cursor(self, delta: int) -> None:
         match self.SELECTED_SUBTAB:
@@ -1485,7 +1485,7 @@ class CharacterInventoryHandler(CharacterInformationHandler):
         )
 
         self.item_list = []
-        self.equipment = []
+        self.equipment = {}
         self.inventory_rows: List[InventoryRow] = []
         self.MAX_INVENTORY_PAGE = None
         self.active_inventory_rows: List[InventoryRow] = []
@@ -1554,11 +1554,11 @@ class CharacterInventoryHandler(CharacterInformationHandler):
                 # not in equipment screen, it's in the Essences screen!
                 continue
             item = self.equipment.get(etype, None)
-            if not isinstance(item, Equippable):
+            if not isinstance(item, Item):
                 item = None
                 letter = etype.value.upper()
                 name = "N/A"
-                selectable = False
+                selectable = True
             else:
                 item: Item
                 letter = etype.value.upper()
@@ -1646,9 +1646,18 @@ class CharacterInventoryHandler(CharacterInformationHandler):
         selectable_indices = [
             i for i, row in enumerate(self.equipment_rows) if row.selectable
         ]
+        if self.SELECTED_INVENTORY_INDEX is None:
+            self.SELECTED_INVENTORY_INDEX = (
+                selectable_indices[0] if delta > 0 else selectable_indices[-1]
+            )
+            return
         current_pos = selectable_indices.index(self.SELECTED_INVENTORY_INDEX)
         new_pos = (current_pos + delta) % len(selectable_indices)
-        self.SELECTED_INVENTORY_INDEX = new_pos
+        self.SELECTED_INVENTORY_INDEX = selectable_indices[new_pos]
+
+    def move_subtab_cursor(self, delta: int) -> None:
+        self.SELECTED_INVENTORY_INDEX = None
+        super().move_subtab_cursor(delta)
 
     def render_inventory(self, console: tcod.console.Console) -> None:
 
@@ -1661,7 +1670,11 @@ class CharacterInventoryHandler(CharacterInformationHandler):
                 continue
             selected = idx == self.SELECTED_INVENTORY_INDEX
             fg = self.PALETTE.white if selected else self.PALETTE.mid_light
-            name_fg = self.PALETTE.white if selected else self.PALETTE.light
+            name_fg = (
+                self.PALETTE.white
+                if selected
+                else render_functions.get_item_inventory_color(item.item)
+            )
             bg = self.PALETTE.mid_dark if selected else None
             letter_starter = f"{item.letter}) "
             item_name = f"{item.name}"
@@ -1682,7 +1695,11 @@ class CharacterInventoryHandler(CharacterInformationHandler):
 
             selected = idx == self.SELECTED_INVENTORY_INDEX
             fg = self.PALETTE.white if selected else self.PALETTE.mid_light
-            name_fg = self.PALETTE.white if selected else self.PALETTE.light
+            item_inv_color = self.PALETTE.light
+            if item.item is not None:
+                item_inv_color = render_functions.get_item_inventory_color(item.item)
+
+            name_fg = self.PALETTE.white if selected else item_inv_color
             bg = self.PALETTE.mid_dark if selected else None
 
             title_fg = self.PALETTE.white
@@ -1715,6 +1732,7 @@ class CharacterInventoryHandler(CharacterInformationHandler):
                 self.render_inventory(console)
             case 1:
                 self.render_equipment(console)
+        self.item_info_handler.on_render(console)
 
     def _handle_key(self, event):
         key = event.sym
@@ -1741,6 +1759,15 @@ class CharacterInventoryHandler(CharacterInformationHandler):
         elif key == tcod.event.KeySym.DOWN:
             self.move_selection_cursor(1)
 
+        if self.SELECTED_SUBTAB == 0 and self.active_inventory_rows:
+            # Handle letter-based inventory selection (a–z)
+            if tcod.event.KeySym.A <= key <= tcod.event.KeySym.Z:
+                letter = chr(ord("a") + (key - tcod.event.KeySym.A))
+
+                for idx, row in enumerate(self.active_inventory_rows):
+                    if row.selectable and row.letter == letter:
+                        self.SELECTED_INVENTORY_INDEX = idx
+                        break
         return super()._handle_key(event)
 
 
@@ -1764,15 +1791,15 @@ class CharacterInventoryItemInformationhandler(EventHandler):
 
     @property
     def max_char_width(self) -> int:
-        return self.starting_x - (self.parent.x - self.parent.frame_width)
+        return (self.parent.x + self.parent.frame_width) - (self.starting_x + 2)
 
     @property
     def name(self) -> str:
         return self.item.name
 
     @property
-    def description(self) -> str:
-        return self.item.description
+    def description(self) -> List[str]:
+        return self.wrap_text(self.item.description)
 
     @property
     def weight(self) -> str:
@@ -1787,23 +1814,209 @@ class CharacterInventoryItemInformationhandler(EventHandler):
         return self.parent.PALETTE
 
     @property
-    def etypes(self) -> Tuple[EquipmentTypes]:
-        if self.item.equippable:
-            etypes = self.item.equippable.equipment_type
-            if not isinstance(etypes, tuple):
-                etypes = (etypes,)
-            return etypes
-        return None
+    def slot_info(self) -> Tuple[EquipmentTypes]:
+        if not self.item.equippable:
+            return None
+        etypes = self.item.equippable.equipment_type
+        if not isinstance(etypes, tuple):
+            return etypes.value.upper()
+        type_list = []
+        for etype in etypes:
+            type_list.append(etype.value.upper())
+        return ", ".join(type_list)
 
     @property
-    def bonuses(self) -> Optional[
-        Dict[
-            StatTypes | Tuple[StatTypes, DamageTypes],
-            StatModifier | List[StatModifier],
-        ]
-    ]:
-        if self.item.equippable:
-            return self.item.equippable.bonuses
+    def bonuses(self) -> Optional[List[str]]:
+        if not self.item.equippable:
+            return
+        bonuses = self.item.equippable.bonuses
+        if bonuses == {} or bonuses is None:
+            return None
+        final_list = []
+        special_damage_types = {
+            menu_text.STAT_TYPE_NAMES.get(StatTypes.DAMAGE_AMPS).upper(),
+            menu_text.STAT_TYPE_NAMES.get(StatTypes.DAMAGE_RESISTS).upper(),
+        }
+        for stype, modifiers in bonuses.items():
+            if not isinstance(modifiers, list):
+                modifiers = [modifiers]
+            if isinstance(stype, tuple):
+                damage_stat_type = stype[0]
+                damage_stat_type = menu_text.STAT_TYPE_NAMES.get(
+                    damage_stat_type, damage_stat_type.value
+                ).upper()
+                damage_type = stype[1].value.upper()
+                stat_text = f"  {damage_stat_type} ({damage_type}): "
+            else:
+                damage_stat_type = None
+
+                stat_text = (
+                    f"  {menu_text.STAT_TYPE_NAMES.get(stype, stype.value.upper())}: "
+                )
+
+            mod_text = []
+            for modifier in modifiers:
+                match modifier.mod_type:
+                    case StatModType.FLAT:
+                        starter = "+"
+                        ender = ""
+                        if damage_stat_type in special_damage_types:
+                            ender = "%"
+                    case StatModType.FLAT_RIGID:
+                        starter = "+"
+                        ender = " (rigid)"
+                    case StatModType.PERCENT_ADD:
+                        starter = "+"
+                        ender = "%"
+                    case StatModType.PERCENT_MULT:
+                        starter = "*"
+                        ender = ""
+                    case _:
+                        print("oh no")
+                if damage_stat_type is None:
+                    mod_text.append(
+                        f"{starter}{round_for_display(modifier.value)}{ender}"
+                    )
+                else:
+                    if damage_stat_type in special_damage_types:
+                        mod_text.append(
+                            f"{starter}{round_for_display(modifier.value*100)}{ender}"
+                        )
+                    else:
+                        mod_text.append(
+                            f"{starter}{round_for_display(modifier.value)}{ender}"
+                        )
+
+            if len(mod_text) > 1:
+                mod_text = ", ".join(mod_text)
+            else:
+                mod_text = mod_text[0]
+            final_text = f"{stat_text}{mod_text}"
+            final_list.append(final_text)
+
+        final_list = None if not final_list else final_list
+
+        return final_list
+
+    @property
+    def equipment_tags(self) -> Optional[str]:
+        if not isinstance(self.item.equippable, (WeaponEquippable, ArmorEquippable)):
+            return None
+        tags = self.item.equippable.tags
+        final_list = []
+        for tag in tags:
+            final_list.append(tag.value.upper())
+        final_list = ", ".join(final_list)
+        return f"{final_list}"
+
+    @property
+    def weapon_info(self) -> Optional[List[str]]:
+        if not isinstance(self.item.equippable, WeaponEquippable):
+            return None
+        weapon = self.item.equippable
+        attack_mods = weapon.attack_mods
+        damage_mods = weapon.damage_mods
+        weapon_range = weapon.weapon_range
+        attack_init_cost = weapon.attack_init_cost
+
+        final_list = []
+
+        attack_beginning_message = "ATTACK: "
+        attack_list = []
+        for stype, smod in attack_mods.items():
+            stat_text = f"{menu_text.STAT_TYPE_NAMES.get(stype, stype.value.upper())}"
+            mod_text = f"{round_for_display(smod.value*100)}% "
+            attack_list.append(f"{mod_text}{stat_text}")
+        final_list.append(attack_beginning_message + ", ".join(attack_list))
+
+        final_list.append("DAMAGE:")
+        damage_list = []
+        for dtype, dmod in damage_mods.items():
+            damage_type_text = f"  {dtype.value.upper()}: "
+            for stype, smod in dmod.items():
+                stat_text = (
+                    f"{menu_text.STAT_TYPE_NAMES.get(stype, stype.value.upper())}"
+                )
+                mod_text = f"{round_for_display(smod.value*100)}% "
+                damage_list.append(f"{mod_text}{stat_text}")
+            final_list.append(f"{damage_type_text}" + ", ".join(damage_list))
+
+        weapon_range_text = (
+            weapon_range.max_range if not weapon_range.is_melee else "MELEE"
+        )
+        weapon_range_text = "RANGE: " + weapon_range_text
+        final_list.append(f"{weapon_range_text}")
+
+        attack_init_cost_text = (
+            f"COST: {round_for_display(attack_init_cost/consts.TRUE_INIT_FACTOR)} INIT"
+        )
+        final_list.append(attack_init_cost_text)
+        return final_list
+
+    @property
+    def armor_info(self) -> Optional[List[str]]:
+        if not isinstance(self.item.equippable, ArmorEquippable):
+            return None
+        armor = self.item.equippable
+        defense_mods = armor.defense_mods
+
+        final_list = []
+
+        defense_beginning_message = "DEFENSE: "
+        defense_list = []
+        for stype, smod in defense_mods.items():
+            stat_text = f"{menu_text.STAT_TYPE_NAMES.get(stype, stype.value.upper())}"
+            mod_text = f"{round_for_display(smod.value*100)}% "
+            defense_list.append(f"{mod_text}{stat_text}")
+        final_list.append(defense_beginning_message + ", ".join(defense_list))
+
+        return final_list
+
+    def wrap_text(self, text: str) -> List[str]:
+        """
+        Wrap a string into lines that do not exceed self.max_char_width.
+        Lines after the first are indented by two spaces.
+
+        Args:
+            text: The input string to wrap.
+
+        Returns:
+            A list of wrapped and indented lines.
+        """
+        words = text.split()
+        lines: list[str] = []
+
+        current_line: list[str] = []
+        current_length = 0
+        is_first_line = True
+
+        for word in words:
+            max_width = (
+                self.max_char_width if is_first_line else self.max_char_width - 2
+            )
+
+            additional_length = len(word) if not current_line else len(word) + 1
+
+            if current_length + additional_length > max_width:
+                line = " ".join(current_line)
+                if not is_first_line:
+                    line = "  " + line
+
+                lines.append(line)
+
+                current_line = [word]
+                current_length = len(word)
+                is_first_line = False
+            else:
+                current_line.append(word)
+                current_length += additional_length
+
+        if current_line:
+            line = " ".join(current_line)
+            if not is_first_line:
+                line = "  " + line
+            lines.append(line)
+        return lines
 
     def on_render(self, console: tcod.console.Console):
         if self.parent.SELECTED_INVENTORY_INDEX is None:
@@ -1820,30 +2033,89 @@ class CharacterInventoryItemInformationhandler(EventHandler):
         if self.item is None:
             return
 
-        self.x = self.frame_width // 2 + self.x + 2
-        self.y = self.text_y + 1
+        self.x = self.starting_x
+        self.y = self.starting_y
 
         self.render_name(console)
 
-        if self.item is not None:
-            if self.item.consumable:
-                self.render_consumable(console)
-            elif self.item.equippable:
-                self.render_equippable(console)
+        self.render_description(console)
+
+        if self.item.consumable:
+            self.render_consumable(console)
+        elif self.item.equippable:
+            self.render_equippable(console)
 
     def render_name(self, console) -> None:
         console.print(x=self.x, y=self.y, text=self.name, fg=self.item_color)
-        self.y += 4
+        self.y += 2
 
     def render_description(self, console) -> None:
-        pass
+        for line in self.description:
+            console.print(x=self.x, y=self.y, text=line, fg=self.palette.light)
+            self.y += 2
+        self.y += 2
 
     def render_consumable(self, console) -> None:
         # TODO: eventually, one day...
         pass
 
     def render_equippable(self, console) -> None:
-        pass
+        slot_text = "SLOT(S): "
+        console.print(x=self.x, y=self.y, text=slot_text, fg=self.palette.mid_light)
+        console.print(
+            x=self.x + len(slot_text),
+            y=self.y,
+            text=self.slot_info,
+            fg=self.palette.light,
+        )
+        self.y += 2
+
+        if self.equipment_tags is not None:
+            tag_text = "TAGS: "
+            console.print(x=self.x, y=self.y, text=tag_text, fg=self.palette.mid_light)
+            console.print(
+                x=self.x + len(tag_text),
+                y=self.y,
+                text=self.equipment_tags,
+                fg=self.palette.light,
+            )
+            self.y += 2
+        self.y += 2
+
+        if self.weapon_info is not None:
+            self.weapon_info: list[str]
+            console.print(
+                x=self.x, y=self.y, text="WEAPON INFO:", fg=self.palette.mid_light
+            )
+            self.y += 2
+            for line in self.weapon_info:
+                console.print(x=self.x, y=self.y, text=line, fg=self.palette.light)
+                self.y += 2
+            self.y += 2
+
+        if self.armor_info is not None:
+            self.armor_info: list[str]
+            console.print(
+                x=self.x, y=self.y, text="ARMOR INFO:", fg=self.palette.mid_light
+            )
+            self.y += 2
+            for line in self.armor_info:
+                console.print(x=self.x, y=self.y, text=line, fg=self.palette.light)
+                self.y += 2
+            self.y += 2
+
+        if self.bonuses is not None:
+            self.bonuses: list[str]
+            console.print(
+                x=self.x, y=self.y, text="BONUSES:", fg=self.palette.mid_light
+            )
+            self.y += 2
+            for bonus in self.bonuses:
+                console.print(x=self.x, y=self.y, text=bonus, fg=self.palette.light)
+                self.y += 2
+
+    def _handle_key(self, event):
+        return super()._handle_key(event)
 
 
 class LevelUpEventHandler(AskUserEventHandler):

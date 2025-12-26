@@ -40,6 +40,7 @@ class Entity:
         char: str = "?",
         color: Tuple[int, int, int] = (255, 255, 255),
         name: str = "<Unnamed>",
+        description: str = None,
         blocks_movement: bool = False,
         render_order: RenderOrder = RenderOrder.CORPSE,
     ):
@@ -48,6 +49,7 @@ class Entity:
         self.char = char
         self.color = color
         self.name = name
+        self.description = description
 
         # player name, to be set with an inquiry
         self.personal_name = self.name
@@ -103,6 +105,7 @@ class Actor(Entity):
         char: str = "?",
         color: Tuple[int, int, int] = (255, 255, 255),
         name: str = "<Unnamed>",
+        description: str = None,
         ai_cls: Type[BaseAI],
         equipment: Equipment,
         fighter: Fighter,
@@ -118,6 +121,7 @@ class Actor(Entity):
             char=char,
             color=color,
             name=name,
+            description=description,
             blocks_movement=True,
             render_order=RenderOrder.ACTOR,
         )
@@ -183,11 +187,10 @@ class Item(Entity):
             char=char,
             color=color,
             name=name,
+            description=description,
             blocks_movement=False,
             render_order=RenderOrder.ITEM,
         )
-
-        self.description = description
 
         self.weight = weight
 

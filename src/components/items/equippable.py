@@ -15,6 +15,8 @@ from components.stats.damage_types import DamageTypes
 from components.stats.build_composite_stat import build_composite_stat
 from components.stats.weapon_range import WeaponRange
 from components.stats.damage import Damage
+from components.items.weapons.weapon_types import WeaponTypes, WEAPONS
+from components.items.armor.armor_types import ArmorTypes, ARMORS
 
 from components.wallet.currencies import Currency
 
@@ -44,6 +46,8 @@ class Equippable(BaseComponent):
         self.bonuses = bonuses or {}
         self.weight = 0
         self.is_essence = equipment_type == EquipmentTypes.ESSENCE
+        self.tags = None
+        print(self.equipment_type)
 
     def init_hook(self) -> None:
         """Set the source of all StatModifiers to self.parent."""
@@ -127,6 +131,7 @@ class WeaponEquippable(Equippable):
         ] = None,
         weapon_range: Optional[WeaponRange] = None,
         attack_init_cost: float = consts.MAX_INIT / 2,  # 50 init,
+        base: str = None,
     ):
         if equipment_type not in self.VALID_EQUIPMENT_TYPES:
             raise ValueError(
@@ -137,6 +142,11 @@ class WeaponEquippable(Equippable):
         self.damage_mods = damage_mods or {}
         self.attack_init_cost = attack_init_cost or {}
         self.weapon_range = weapon_range or WeaponRange(max_range=None)
+        if base is not None:
+            base = WeaponTypes.enum_from_string(base)
+            self.tags = WEAPONS[base].tags
+        else:
+            self.tags = None
 
     def init_hook(self) -> None:
         """Set the source of all StatModifiers to self.parent."""
@@ -191,6 +201,7 @@ class ArmorEquippable(Equippable):
             ]
         ] = None,
         defense_mods: Dict[StatTypes, StatModifier | List[StatModifier]] = None,
+        base: str = None,
     ):
         if equipment_type not in self.VALID_EQUIPMENT_TYPES:
             raise ValueError(
@@ -198,6 +209,11 @@ class ArmorEquippable(Equippable):
             )
         super().__init__(equipment_type, bonuses)
         self.defense_mods = defense_mods or {}
+        if base is not None:
+            base = ArmorTypes.enum_from_string(base)
+            self.tags = ARMORS[base].tags
+        else:
+            self.tags = None
 
     def init_hook(self) -> None:
         """Set the source of all StatModifiers to self.parent."""
@@ -218,57 +234,3 @@ class ArmorEquippable(Equippable):
             stat_mods=self.defense_mods,
             source=self,
         )
-
-
-class GreatHammer(WeaponEquippable):
-    def __init__(self):
-        super().__init__(
-            equipment_type=(EquipmentTypes.MAIN_HAND, EquipmentTypes.OFF_HAND),
-            bonuses={
-                StatTypes.STRENGTH: StatModifier(
-                    value=2, mod_type=StatModType.FLAT, source="SELF"
-                )
-            },
-            attack_mods={
-                StatTypes.STRENGTH: StatModifier(
-                    value=0.5, mod_type=StatModType.PERCENT_MULT, source="SELF"
-                ),
-                StatTypes.DEXTERITY: StatModifier(
-                    value=0.5, mod_type=StatModType.PERCENT_MULT, source="SELF"
-                ),
-            },
-            damage_mods={
-                DamageTypes.BLUDGEONING: {
-                    StatTypes.STRENGTH: StatModifier(
-                        value=0.8, mod_type=StatModType.PERCENT_MULT, source="SELF"
-                    ),
-                    StatTypes.DEXTERITY: StatModifier(
-                        value=0.05, mod_type=StatModType.PERCENT_MULT, source="SELF"
-                    ),
-                }
-            },
-            weapon_range=WeaponRange(),
-            attack_init_cost=consts.MAX_INIT * (3 / 4),
-        )
-
-
-"""
-class Dagger(Equippable):
-    def __init__(self) -> None:
-        super().__init__(equipment_type=EquipmentTypes.WEAPON, power_bonus=2)
-
-
-class Sword(Equippable):
-    def __init__(self) -> None:
-        super().__init__(equipment_type=EquipmentTypes.WEAPON, power_bonus=4)
-
-
-class LeatherArmor(Equippable):
-    def __init__(self) -> None:
-        super().__init__(equipment_type=EquipmentTypes.ARMOR, defense_bonus=1)
-
-
-class ChainMail(Equippable):
-    def __init__(self) -> None:
-        super().__init__(equipment_type=EquipmentTypes.ARMOR, defense_bonus=3)
-"""

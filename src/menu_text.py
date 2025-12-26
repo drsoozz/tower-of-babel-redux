@@ -153,6 +153,17 @@ DAMAGE_TYPE_ABBREVIATIONS: dict[DamageTypes, str] = {
     DamageTypes.PROFANE: "PROFN",
     DamageTypes.ELDRITCH: "ELDCH",
 }
+STAT_TYPE_NAMES: dict[StatTypes, str] = {
+    StatTypes.STRENGTH: "STR",
+    StatTypes.DEXTERITY: "DEX",
+    StatTypes.CONSTITUTION: "CON",
+    StatTypes.INTELLIGENCE: "INT",
+    StatTypes.CUNNING: "CUN",
+    StatTypes.WILLPOWER: "WIL",
+    StatTypes.DAMAGE_AMPS: "AMP.",
+    StatTypes.DAMAGE_RESISTS: "RESIST",
+    StatTypes.DAMAGE_MASTERIES: "MASTERY",
+}
 
 COMBAT_TEXT_DESCRIPTIONS: list[StatDescriptor] = [
     StatDescriptor(

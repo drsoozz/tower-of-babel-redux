@@ -214,10 +214,10 @@ def render_character_information_screens(
 
 
 def get_item_inventory_color(item: Item) -> tuple[int, int, int]:
-    color = item.color
+    icolor = item.color
     weighter = 255
     return (
-        (color[0] + weighter) / 2,
-        (color[1] + weighter) / 2,
-        (color[2] + weighter) / 2,
+        (icolor[0] + weighter) // 2,
+        (icolor[1] + weighter) // 2,
+        (icolor[2] + weighter) // 2,
     )

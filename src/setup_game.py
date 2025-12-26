@@ -55,19 +55,23 @@ def new_game() -> Engine:
 
     from load_entity import load_entity
 
-    for _ in range(15):
-        kite_shield = load_entity("kite_shield")
-        kite_shield.parent = player.inventory
-        scimitar = load_entity("scimitar")
-        scimitar.parent = player.inventory
-        greathammer = load_entity("greathammer")
-        greathammer.parent = player.inventory
-        goblin_shiv = load_entity("goblin_shiv")
-        goblin_shiv.parent = player.inventory
-        player.inventory.add(kite_shield)
-        player.inventory.add(scimitar)
-        player.inventory.add(greathammer)
-        player.inventory.add(goblin_shiv)
+    kite_shield = load_entity("kite_shield")
+    player.inventory.add(kite_shield)
+
+    scimitar = load_entity("scimitar")
+    player.inventory.add(scimitar)
+
+    greathammer = load_entity("greathammer")
+    player.inventory.add(greathammer)
+
+    goblin_shiv = load_entity("goblin_shiv")
+    player.inventory.add(goblin_shiv)
+
+    tbp = load_entity("troll_blood_pendant")
+    player.inventory.add(tbp)
+
+    hgitem = load_entity("hobgoblins_pauldrons")
+    player.inventory.add(hgitem)
 
     return engine
 

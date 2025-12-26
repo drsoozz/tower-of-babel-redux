@@ -1,7 +1,7 @@
 {
     "entity_type": "item",
     "char": "[",
-    "color": [0, 191, 255],
+    "color": [150, 179, 227],
     "name": "Iron Leg Armor",
     "equippable": {
         "equippable_type": "armor",

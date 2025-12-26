@@ -134,6 +134,7 @@ def load_weapon(data: Dict) -> Dict:
     if data.get("weight", None) is not None:
         weight = data.get("weight")
     equippable_args = base["equippable_args"]
+    equippable_args["base"] = equippable_data.get("base_weapon", None)
     return {"weight": weight, "equippable": WeaponEquippable(**equippable_args)}
 
 
@@ -201,6 +202,7 @@ def load_armor(data: Dict) -> Dict:
                 print("!?!?!")
 
     equippable_args = base["equippable_args"]
+    equippable_args["base"] = equippable_data.get("base_armor", None)
     equippable_args["equipment_type"] = EquipmentTypes.enum_from_string(slots)
     return {"weight": weight, "equippable": ArmorEquippable(**equippable_args)}
 
@@ -209,7 +211,12 @@ def load_normal_equippable(data: Dict) -> Dict:
     equippable_data = data.get("equippable")
     slots = equippable_data.get("slots")
     if isinstance(slots, list):
-        slots = tuple(slots)
+        _slots = []
+        for slot in slots:
+            _slots = EquipmentTypes.enum_from_string(slot)
+        slots = tuple(_slots)
+    else:
+        slots = EquipmentTypes.enum_from_string(slots)
     weight = data.get("weight")
 
     bonuses_data = equippable_data.get("bonuses", {})  # stuff from the actual item json

@@ -1,7 +1,7 @@
 {
     "entity_type": "item",
-    "char": "?",
-    "color": [0, 191, 255],
+    "char": "/",
+    "color": [61, 255, 0],
     "name": "Goblin Shiv",
     "description": "A dagger, poorly made out of suspiciously goblin-like bones. A thick green liquid always seems to be dripping from the blade.",
     "weight": 0.1,
