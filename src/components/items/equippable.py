@@ -47,7 +47,6 @@ class Equippable(BaseComponent):
         self.weight = 0
         self.is_essence = equipment_type == EquipmentTypes.ESSENCE
         self.tags = None
-        print(self.equipment_type)
 
     def init_hook(self) -> None:
         """Set the source of all StatModifiers to self.parent."""
