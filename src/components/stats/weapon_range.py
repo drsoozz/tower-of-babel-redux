@@ -4,7 +4,13 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class WeaponRange:
-    max_range: Optional[int] = None  # None → melee
+    _max_range: Optional[int] = None  # None → melee
+
+    @property
+    def max_range(self) -> int:
+        if self._max_range is None or self._max_range < 1:
+            return 1
+        return self._max_range
 
     @property
     def is_melee(self) -> bool:

@@ -55,7 +55,7 @@ DEFAULT_UNARMED_DAMAGE_DICT = {
         ),
     }
 }
-DEFAULT_UNARMED_WEAPON_RANGE = WeaponRange(max_range=None)
+DEFAULT_UNARMED_WEAPON_RANGE = WeaponRange(_max_range=None)
 
 DEFAULT_UNARMED_ATTACK_INIT_COST = MAX_INIT / 2
 

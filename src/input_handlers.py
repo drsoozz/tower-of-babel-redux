@@ -25,6 +25,7 @@ from components.stats.resource import Resource
 from components.equipment_types import EquipmentTypes
 from components.items.equippable import WeaponEquippable, ArmorEquippable, Equippable
 from components.stats.stat_modifier import StatModifier
+from components.wallet.currencies import Currency
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -209,7 +210,7 @@ class EventHandler(BaseEventHandler):
         return self
 
     def handle_action(
-        self, action: Optional[Action], console: tcod.console.Console
+        self, action: Optional[Action], console: tcod.console.Console = None
     ) -> bool:
         """Handle actions returned from event methods.
 
@@ -225,9 +226,11 @@ class EventHandler(BaseEventHandler):
             return False  # Skip enemy turn on exceptions.
         for _ in self.engine.handle_enemy_turns():
             self.engine.update_fov()
-            self.on_render(console)
+            if console:
+                self.on_render(console)
         self.engine.update_fov()
-        self.on_render(console)
+        if console:
+            self.on_render(console)
         return True
 
     def _handle_key(self, event: tcod.event.KeyDown) -> Optional[Action]:
@@ -1069,6 +1072,21 @@ class CharacterStatsHandler(CharacterInformationHandler):
             fg=self.PALETTE.white,
         )
         y += 4
+        console.print(
+            x=x,
+            y=y,
+            text=f"§: {self.engine.player.wallet.balance(Currency.SOUL_COIN)}",
+            fg=self.PALETTE.white,
+        )
+        y += 2
+        console.print(
+            x=x,
+            y=y,
+            text=f"☼: {self.engine.player.wallet.balance(Currency.SPIRIT_ASH)}",
+            fg=self.PALETTE.white,
+        )
+
+        y += 4
 
         # Stat list
         for idx, row in enumerate(self.base_stat_rows):
@@ -1452,7 +1470,7 @@ class CharacterStatsHandler(CharacterInformationHandler):
             tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
         ):
             # essence screen
-            pass
+            return CharacterEssenceHandler(self.engine)
 
         # cursor movement
         if key == tcod.event.KeySym.LEFT:
@@ -1492,7 +1510,7 @@ class CharacterInventoryHandler(CharacterInformationHandler):
         self.equipment_rows: List[InventoryRow] = []
         self.regenerate_inventory()
 
-        self.item_info_handler = CharacterInventoryItemInformationhandler(
+        self.item_info_handler = CharacterInventoryItemInformationHandler(
             self.engine, self
         )
         self.item_info_handler.parent = self
@@ -1768,10 +1786,25 @@ class CharacterInventoryHandler(CharacterInformationHandler):
                     if row.selectable and row.letter == letter:
                         self.SELECTED_INVENTORY_INDEX = idx
                         break
+
+        if self.SELECTED_INVENTORY_INDEX is not None and self.current_item is not None:
+            if key == tcod.event.KeySym.RETURN:
+                return CharacterInventoryItemQueryHandler(self.engine, self)
         return super()._handle_key(event)
 
+    @property
+    def current_item(self) -> Optional[Item]:
+        match self.SELECTED_SUBTAB:
+            case 0:
+                rows = self.inventory_rows
+            case _:
+                rows = self.equipment_rows
 
-class CharacterInventoryItemInformationhandler(EventHandler):
+        current_item = rows[self.SELECTED_INVENTORY_INDEX].item
+        return current_item
+
+
+class CharacterInventoryItemInformationHandler(EventHandler):
     parent: CharacterInventoryHandler
 
     def __init__(self, engine, parent):
@@ -1799,6 +1832,8 @@ class CharacterInventoryItemInformationhandler(EventHandler):
 
     @property
     def description(self) -> List[str]:
+        if self.item.description is None:
+            return [""]
         return self.wrap_text(self.item.description)
 
     @property
@@ -2118,6 +2153,209 @@ class CharacterInventoryItemInformationhandler(EventHandler):
         return super()._handle_key(event)
 
 
+class CharacterInventoryItemQueryHandler(AskUserEventHandler):
+    def __init__(self, engine, parent: CharacterInventoryHandler):
+        self.parent = parent
+        super().__init__(
+            engine,
+            self.parent.frame_width - 105,
+            self.parent.frame_height - 61,
+            "ITEM ACTIONS",
+            None,
+        )
+        self.item = None
+        if self.parent.SELECTED_INVENTORY_INDEX is None:
+            return
+
+        match self.parent.SELECTED_SUBTAB:
+            case 0:
+                rows = self.parent.inventory_rows
+            case _:
+                rows = self.parent.equipment_rows
+
+        self.item = rows[self.parent.SELECTED_INVENTORY_INDEX].item
+        self.palette = self.parent.PALETTE
+
+    def on_render(self, console: tcod.console.Console) -> None:
+        self.parent.on_render(console)
+        if self.item is not None:
+            console.draw_frame(
+                x=self.x,
+                y=self.y,
+                width=self.frame_width,
+                height=self.frame_height,
+                clear=True,
+                fg=self.palette.light,
+                bg=self.palette.dark,
+            )
+            console.print(self.text_x, self.y, self.TITLE)
+            use_text = ""
+            if self.item.consumable:
+                use_text = "CONSUME"
+            elif self.item.equippable:
+                is_equipped = self.engine.player.equipment.item_is_equipped(self.item)
+                if is_equipped:
+                    use_text = "UNEQUIP"
+                else:
+                    use_text = "EQUIP"
+                if self.item.equippable.is_essence:
+                    use_text = "INFUSE"
+            console.print(self.text_x, self.text_y, text=f"[E] {use_text}")
+            console.print(self.text_x, self.text_y + 2, text="[D] DROP")
+
+    def use_item(self) -> Action:
+        item = self.item
+        if item.consumable:
+            # Return the action for the selected item.
+            self.handle_action(item.consumable.get_action(self.engine.player))
+            self.parent.regenerate_inventory()
+            return self.parent
+        elif item.equippable:
+            if item.equippable.is_essence:
+                self.handle_action(actions.EquipEssenceAction(self.engine.player, item))
+                self.parent.regenerate_inventory()
+                return self.parent
+            self.handle_action(actions.EquipAction(self.engine.player, item))
+            self.parent.regenerate_inventory()
+            return self.parent
+        else:
+            return self.parent
+
+    def drop_item(self) -> Action:
+        self.handle_action(actions.DropItem(self.engine.player, self.item))
+        self.parent.regenerate_inventory()
+        return self.parent
+
+    def _handle_key(self, event):
+        key = event.sym
+        if key == tcod.event.KeySym.ESCAPE:
+            return self.parent
+        if key == tcod.event.KeySym.E:
+            return self.use_item()
+        if key == tcod.event.KeySym.D:
+            return self.drop_item()
+        return super()._handle_key(event)
+
+
+class CharacterEssenceHandler(CharacterInventoryHandler):
+    SUBTABS = ["IMBUED ESSENCES"]
+    SELECTED_SUBTAB = 0
+    SUBTAB_SPACER = "  "
+    SELECTED_INVENTORY_INDEX = None
+    SELECTED_INVENTORY_PAGE = 0
+    MAX_INVENTORY_PAGE = None
+    INVENTORY_ROWS_LENGTH = 26
+
+    def __init__(self, engine):
+        super().__init__(
+            engine,
+        )
+
+        self.SELECTED_TAB = 2
+        self.PALETTE = color.menu_essence_palette
+        self.SUBTABS = ["IMBUED ESSENCES"]
+        self.SELECTED_SUBTAB = 0
+
+        self.item_list = []
+        self.inventory_rows: List[InventoryRow] = []
+        self.MAX_INVENTORY_PAGE = None
+        self.active_inventory_rows: List[InventoryRow] = []
+        self.regenerate_inventory()
+
+        self.item_info_handler = CharacterInventoryItemInformationHandler(
+            self.engine, self
+        )
+        self.item_info_handler.parent = self
+
+    def regenerate_inventory(self) -> None:
+        self._build_item_list()
+        self._build_inventory_rows()
+        self.MAX_INVENTORY_PAGE = math.floor(
+            len(self.item_list) / self.INVENTORY_ROWS_LENGTH
+        )
+        self._build_active_inventory_rows()
+
+    def _build_inventory_rows(self) -> List[InventoryRow]:
+        rows: List[InventoryRow] = []
+
+        for idx, item in enumerate(self.item_list):
+            item: Optional[Item]
+            letter = f"LEVEL {idx}: "
+            if item:
+                name = item.name
+            else:
+                name = None
+            selectable = True
+            rows.append(
+                InventoryRow(item=item, letter=letter, name=name, selectable=selectable)
+            )
+        self.inventory_rows = rows
+
+    def _build_item_list(self) -> None:
+        self.item_list = self.engine.player.essence.slots
+
+    def move_selection_cursor(self, delta: int) -> None:
+        match self.SELECTED_SUBTAB:
+            case 0:
+                self.move_inventory_cursor(delta)
+
+    def render_inventory(self, console: tcod.console.Console) -> None:
+
+        x = self.text_x
+        y = self.text_y + 1
+
+        for idx, item in enumerate(self.active_inventory_rows):
+            if not item.letter:
+                y += 1
+                continue
+            selected = idx == self.SELECTED_INVENTORY_INDEX
+            fg = self.PALETTE.white if selected else self.PALETTE.mid_light
+            name_fg = (
+                self.PALETTE.white
+                if selected
+                else render_functions.get_item_inventory_color(item.item)
+            )
+            bg = self.PALETTE.mid_dark if selected else None
+            letter_starter = f"{item.letter}"
+            item_name = f"{item.name}"
+            console.print(x=x, y=y, text=letter_starter, fg=fg, bg=bg)
+            console.print(
+                x=x + len(letter_starter), y=y, text=item_name, fg=name_fg, bg=bg
+            )
+            y += 2
+
+    def on_render(self, console):
+        super().on_render(console)
+        match self.SELECTED_SUBTAB:
+            case 0:
+                self.render_inventory(console)
+        self.item_info_handler.on_render(console)
+
+    def _handle_key(self, event):
+        key = event.sym
+        modifier = event.mod
+
+        # character information screens traversal
+        if key == tcod.event.KeySym.LEFT and modifier & (
+            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
+        ):
+            # stats screen
+            return CharacterStatsHandler(self.engine)
+        if key == tcod.event.KeySym.RIGHT and modifier & (
+            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
+        ):
+            # skills screen
+            pass
+
+        # cursor movement
+        elif key == tcod.event.KeySym.UP:
+            self.move_selection_cursor(-1)
+        elif key == tcod.event.KeySym.DOWN:
+            self.move_selection_cursor(1)
+
+        return super()._handle_key(event)
+
+
 class LevelUpEventHandler(AskUserEventHandler):
 
     def __init__(self, engine):
@@ -2430,11 +2668,6 @@ class MainGameEventHandler(EventHandler):
         ):
             return QueryRestLoopHandler(self.engine)
 
-        if key == tcod.event.KeySym.I and modifier & (
-            tcod.event.Modifier.LSHIFT | tcod.event.Modifier.RSHIFT
-        ):
-            return InventoryDropHandler(self.engine)
-
         if key in MOVE_KEYS:
             dx, dy = MOVE_KEYS[key]
             action = BumpAction(player, dx, dy)
@@ -2447,13 +2680,15 @@ class MainGameEventHandler(EventHandler):
         elif key == tcod.event.KeySym.G:
             action = PickupAction(player)
         elif key == tcod.event.KeySym.I:
-            return InventoryActivateHandler(self.engine)
+            return CharacterInventoryHandler(self.engine)
         elif key == tcod.event.KeySym.L:
             return LookHandler(self.engine)
         elif key == tcod.event.KeySym.TAB:
             return CharacterScreenEventHandler(self.engine)
         elif key == tcod.event.KeySym.O:
             return CharacterStatsHandler(self.engine)
+        elif key == tcod.event.KeySym.K:
+            return CharacterEssenceHandler(self.engine)
         return action
 
 

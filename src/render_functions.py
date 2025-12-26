@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 import math
 
 import color
@@ -213,9 +213,12 @@ def render_character_information_screens(
         )
 
 
-def get_item_inventory_color(item: Item) -> tuple[int, int, int]:
-    icolor = item.color
+def get_item_inventory_color(item: Optional[Item]) -> tuple[int, int, int]:
     weighter = 255
+    if item is None:
+        return [weighter, weighter, weighter]
+
+    icolor = item.color
     return (
         (icolor[0] + weighter) // 2,
         (icolor[1] + weighter) // 2,

@@ -140,7 +140,7 @@ class WeaponEquippable(Equippable):
         self.attack_mods = attack_mods or {}
         self.damage_mods = damage_mods or {}
         self.attack_init_cost = attack_init_cost or {}
-        self.weapon_range = weapon_range or WeaponRange(max_range=None)
+        self.weapon_range = weapon_range or WeaponRange(_max_range=None)
         if base is not None:
             base = WeaponTypes.enum_from_string(base)
             self.tags = WEAPONS[base].tags
