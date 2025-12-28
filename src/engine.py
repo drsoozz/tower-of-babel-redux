@@ -17,12 +17,13 @@ import render_functions
 
 if TYPE_CHECKING:
     from entity import Actor
-    from game_map import GameMap, GameWorld
+    from game_map import GameMap, GameWorld, GameFloor
     from entity import Entity
 
 
 class Engine:
     game_map: GameMap
+    game_floor: GameFloor
     game_world: GameWorld
 
     def __init__(self, player: Actor):
@@ -52,10 +53,6 @@ class Engine:
                 consts.MAX_INIT
                 - sorted_entities[0].fighter.stats.initiative.initiative.value
             )
-            list_of_diffs = [
-                consts.MAX_INIT - actor.fighter.stats.initiative.initiative.value
-                for actor in sorted_entities
-            ]
             # if the smallest difference is larger than zero, than regenerate everyone
             # regenerate() increases the init by min_diff and regens hp, energy, and mana, as according
             # to the actor's respective regen values

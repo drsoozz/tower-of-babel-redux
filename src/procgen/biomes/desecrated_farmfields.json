@@ -1,0 +1,6 @@
+{
+    "name": "Desecrated Farmfields",
+    "rarity": 250,
+    "starting_points": {"1": 50, "2": 100, "3": 25},
+    "spread": 0.85
+}

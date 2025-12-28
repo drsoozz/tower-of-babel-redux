@@ -1,0 +1,6 @@
+{
+    "name": "Cursed Graveyard",
+    "rarity": 50,
+    "starting_points": {"1": 150, "2": 50, "3": 20},
+    "spread": 0.25
+}

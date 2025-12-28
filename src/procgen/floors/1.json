@@ -1,0 +1,6 @@
+{
+    "floor_width": 30,
+    "floor_height": 30,
+    "num_biomes": 3,
+    "biomes": ["desecrated_farmfields", "overgrown_courtyards", "slime_plains", "cursed_graveyard"]
+}

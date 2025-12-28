@@ -1,13 +1,21 @@
 from __future__ import annotations
 
-from typing import Iterable, Iterator, Optional, List, Tuple, TYPE_CHECKING
+import heapq
+from typing import TYPE_CHECKING, Iterable, Iterator, Optional, List, Tuple, Dict, 
+import threading
+import queue
 
-import numpy as np  # type: ignore
+
+import numpy as np
+import numpy.typing as npt
 from tcod.console import Console
 
 import consts
 from entity import Actor, Item
 import tile_types
+from procgen.load_floor_data import load_floor_data
+from procgen.generate_floor import generate_floor
+from procgen.direction_types import DirectionTypes
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -109,6 +117,110 @@ class GameMap:
                 console.print(x=entity.x, y=entity.y, text=entity.char, fg=entity.color)
 
 
+class GameFloor:
+
+    def __init__(
+        self,
+        parent: GameWorld,
+        floor_dimensions: Tuple[int, int],
+        biome_grid: npt.NDArray,
+        connectivity_grid: npt.NDArray,
+        player_location: Tuple[int, int],
+        portal_location: Tuple[int, int],
+    ):
+        # parent stuff
+        self.parent = parent
+        self.engine = self.parent.engine
+        self.map_width = self.parent.map_width
+        self.map_height = self.parent.map_height
+        self.current_floor = self.parent.current_floor
+
+        self.floor_dimensions = floor_dimensions
+        self.floor_width, self.floor_height = self.floor_dimensions
+        self.biome_grid = biome_grid
+        self.connectivity_grid = connectivity_grid
+        self.player_location = player_location
+        self.portal_location = portal_location
+
+        self.floor = np.full(floor_dimensions, None)
+
+        self.x, self.y = self.player_location  # current position
+
+        self.generate_game_map(self.x, self.y)
+        initially_loaded = self.get_neighboring_maps
+        initially_loaded.append((self.x, self.y))
+        for x, y in initially_loaded:
+            self.generate_game_map(x, y)
+
+        # generation order
+        self._gen_queue: list[tuple[int, tuple[int, int]]] = []
+
+        # threading stuff
+        self._request_lock = threading.Lock()
+        self._ready_queue = queue.Queue()
+        self._stop_event = threading.Event()
+
+        self._worker = threading.Thread(target=self._generation_worker, daemon=True)
+        self._worker.start()
+
+    def request_nearby_maps(self, radius: int = 99) -> None:
+        px, py = self.player_location
+
+        with self._request_lock:
+            for x in range(self.floor_width):
+                for y in range(self.floor_height):
+                    if self.floor[x, y] is not None:
+                        continue
+
+                    d = abs(x - px) + abs(y - py)
+                    if d <= radius:
+                        heapq.heappush(self._gen_queue, (d, (x, y)))
+
+    def _generation_worker(self) -> None:
+        while not self._stop_event.is_set():
+            with self._request_lock:
+                if not self._gen_queue:
+                    continue
+                _, (x, y) = heapq.heappop(self._gen_queue)
+
+            # Double-check after popping
+            if self.floor[x, y] is not None:
+                continue
+
+            gamemap = self._build_game_map_data(x, y)
+
+            self._ready_queue.put((x, y, gamemap))
+
+    def process_ready_maps(self) -> None:
+        while not self._ready_queue.empty():
+            x, y, gamemap = self._ready_queue.get()
+            self.floor[x, y] = gamemap
+
+    @property
+    def get_neighboring_maps(self) -> list[tuple[int, int]]:
+        north = self.x, self.y - 1
+        east = self.x + 1, self.y
+        south = self.x, self.y + 1
+        west = self.x - 1, self.y
+        directions = [north, east, south, west]
+        neighbors = []
+        for d in directions:
+            x, y = d
+            if 0 <= x < self.floor_width - 1 and 0 <= y < self.floor_height:
+                neighbors.append(d)
+        return neighbors
+
+    def _build_game_map_data(self, x: int, y: int) -> GameMap:
+        # heavy procgen, NO engine side effects
+        biome = self.biome_grid[x, y]
+        connectivity: Dict[DirectionTypes, tuple[int, int]] = self.connectivity_grid[x, y]
+
+    def generate_game_map(self, x: int, y: int) -> None:
+        # synchronous, main-thread safe
+        gamemap = self._build_game_map_data(x, y)
+        self.floor[x, y] = gamemap
+
+
 class GameWorld:
     """
     Holds the settings for the GameMap, and generates new maps when moving down the stairs.
@@ -123,7 +235,7 @@ class GameWorld:
         max_rooms: int,
         room_min_size: int,
         room_max_size: int,
-        current_floor: int = 0,
+        current_floor: int = 1,
     ):
         self.engine = engine
 
@@ -136,17 +248,9 @@ class GameWorld:
         self.room_max_size = room_max_size
 
         self.current_floor = current_floor
+        self.game_floor: GameFloor = None
 
     def generate_floor(self) -> None:
-        from procgen import generate_dungeon
-
-        self.current_floor += 1
-
-        self.engine.game_map = generate_dungeon(
-            max_rooms=self.max_rooms,
-            room_min_size=self.room_min_size,
-            room_max_size=self.room_max_size,
-            map_width=self.map_width,
-            map_height=self.map_height,
-            engine=self.engine,
-        )
+        floor_args = generate_floor(self.current_floor)
+        floor_args["parent"] = self
+        self.game_floor = GameFloor(**floor_args)
